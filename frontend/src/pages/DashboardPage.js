@@ -6,8 +6,8 @@ import { Progress } from '../components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
-import { Upload, FileText, Activity, TrendingUp, Brain, GitBranch, FileDown, MessageSquare, Trash2, Play, Clock, BarChart3, TrendingDown } from 'lucide-react';
-import { uploadAPI, analysisAPI, chatAPI, reportAPI } from '../lib/api';
+import { Upload, FileText, Activity, TrendingUp, Brain, GitBranch, MessageSquare, Trash2, Play, Clock, BarChart3, TrendingDown } from 'lucide-react';
+import { uploadAPI, analysisAPI, chatAPI } from '../lib/api';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, Cell } from 'recharts';
 
 export default function DashboardPage() {
@@ -167,23 +167,6 @@ export default function DashboardPage() {
     } catch (error) {
       toast.error('Chat failed');
       setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error.' }]);
-    }
-  };
-
-  const downloadReport = async (analysisId) => {
-    try {
-      const response = await reportAPI.downloadReport(analysisId);
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `RCA_Report_${analysisId}.md`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success('Report downloaded');
-    } catch (error) {
-      toast.error('Failed to download report');
     }
   };
 
@@ -390,15 +373,6 @@ export default function DashboardPage() {
                               </ul>
                             </div>
                           </div>
-
-                          <Button
-                            onClick={() => downloadReport(currentAnalysis.id)}
-                            className="w-full"
-                            data-testid="download-report-button"
-                          >
-                            <FileDown className="w-4 h-4 mr-2" />
-                            Download Complete Report
-                          </Button>
                         </div>
                       )}
                     </div>

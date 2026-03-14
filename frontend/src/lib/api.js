@@ -48,9 +48,4 @@ export const chatAPI = {
     api.post('/chat', { message, analysis_id: analysisId }),
 };
 
-export const reportAPI = {
-  downloadReport: (analysisId) => 
-    api.get(`/reports/${analysisId}/download`, { responseType: 'blob' }),
-};
-
 export default api;
