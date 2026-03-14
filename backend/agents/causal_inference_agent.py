@@ -46,28 +46,47 @@ class CausalInferenceAgent:
             X = df[numeric_cols].copy()
             X = X.fillna(X.mean())
             
+            # Clean column names
+            original_cols = X.columns.tolist()
+            X.columns = ['col_' + str(i) if not isinstance(col, str) else col.replace('[', '').replace(']', '').replace('<', '').replace('>', '') 
+                        for i, col in enumerate(X.columns)]
+            
             threshold = X.iloc[:, 0].quantile(0.75)
             y = (X.iloc[:, 0] > threshold).astype(int)
             X = X.iloc[:, 1:]
+            original_cols = original_cols[1:]
+            
+            # Ensure we have enough samples
+            if len(X) < 10:
+                return []
             
             model = RandomForestClassifier(n_estimators=50, random_state=42, max_depth=5)
             model.fit(X, y)
             
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(X[:100])
+            # Use TreeExplainer with safe settings
+            explainer = shap.TreeExplainer(model, feature_perturbation='interventional')
+            sample_size = min(50, len(X))
+            shap_values = explainer.shap_values(X[:sample_size])
             
-            if isinstance(shap_values, list):
-                shap_values = shap_values[1]
+            # Handle both binary and multiclass cases
+            if isinstance(shap_values, list) and len(shap_values) > 0:
+                shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
             
-            mean_abs_shap = np.abs(shap_values).mean(axis=0)
+            # Safely compute mean absolute SHAP values
+            if shap_values.ndim == 2:
+                mean_abs_shap = np.abs(shap_values).mean(axis=0)
+            else:
+                mean_abs_shap = np.abs(shap_values)
             
             causal_params = []
-            for i, col in enumerate(X.columns):
-                causal_params.append({
-                    "parameter": col,
-                    "importance": float(mean_abs_shap[i]),
-                    "causality_score": float(mean_abs_shap[i] / mean_abs_shap.sum())
-                })
+            for i, col in enumerate(original_cols):
+                if i < len(mean_abs_shap):
+                    importance = float(mean_abs_shap[i])
+                    causal_params.append({
+                        "parameter": str(col),
+                        "importance": importance,
+                        "causality_score": float(importance / (mean_abs_shap.sum() + 1e-10))
+                    })
             
             return causal_params
             

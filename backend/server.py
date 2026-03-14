@@ -37,6 +37,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Add your routes to the router instead of directly to app
+@api_router.get("/")
+async def root():
+    return {"message": "RCA Platform API", "status": "online", "version": "1.0.0"}
+
+@api_router.get("/health")
+async def health():
+    return {"status": "healthy", "database": "connected"}
+
 @api_router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserCreate):
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})

@@ -50,6 +50,10 @@ class MLValidationAgent:
             X = df[numeric_cols].copy()
             X = X.fillna(X.mean())
             
+            # Clean column names for XGBoost compatibility
+            X.columns = ['col_' + str(i) if not isinstance(col, str) else col.replace('[', '').replace(']', '').replace('<', '').replace('>', '') 
+                        for i, col in enumerate(X.columns)]
+            
             threshold = X.iloc[:, 0].quantile(0.75)
             y = (X.iloc[:, 0] > threshold).astype(int)
             
