@@ -1,0 +1,182 @@
+{
+  "project_identity": {
+    "name": "Machine Failure RCA Platform",
+    "persona": "The Industrial Forensic Architect",
+    "core_philosophy": "Digital Twin Forensics",
+    "emotional_tone": "Trust, Precision, Insight, Control",
+    "archetype": "ARCHETYPE 2: THE PERFORMANCE PRO (Adapted for Reliability Engineering)",
+    "design_principles": [
+      "Fusion: Industrial HMI x Swiss Poster Design",
+      "Density: Every pixel utilized, no wasted space",
+      "Clarity: Data first, decoration second",
+      "Contrast: High contrast for critical alerts"
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Barlow Condensed, sans-serif",
+      "body": "Manrope, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-bold tracking-tight uppercase",
+      "h2": "text-3xl md:text-4xl font-semibold tracking-tight",
+      "h3": "text-xl md:text-2xl font-medium tracking-tight",
+      "body": "text-sm md:text-base leading-relaxed",
+      "label": "text-xs font-mono tracking-widest uppercase opacity-70",
+      "data_large": "text-4xl font-mono font-bold tracking-tighter",
+      "data_medium": "text-xl font-mono font-semibold"
+    },
+    "rules": [
+      "Use 'Barlow Condensed' for all major headings and module titles.",
+      "Use 'JetBrains Mono' for ALL data values, timestamps, and code snippets.",
+      "Use 'Manrope' for body text, tooltips, and navigation.",
+      "Headings > 32px must use 'tracking-tight'.",
+      "Labels must be uppercase and widely tracked."
+    ]
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": {
+        "default": "#09090b", 
+        "paper": "#18181b", 
+        "subtle": "#27272a" 
+      },
+      "foreground": {
+        "default": "#fafafa",
+        "muted": "#a1a1aa",
+        "inverted": "#09090b"
+      },
+      "primary": {
+        "DEFAULT": "#f97316", 
+        "foreground": "#ffffff"
+      },
+      "secondary": {
+        "DEFAULT": "#3b82f6", 
+        "foreground": "#ffffff"
+      },
+      "accent": {
+        "success": "#22c55e",
+        "warning": "#eab308",
+        "error": "#ef4444",
+        "info": "#06b6d4"
+      },
+      "border": {
+        "default": "#27272a",
+        "active": "#f97316" 
+      }
+    },
+    "gradients": {
+      "tracing_beam": "linear-gradient(90deg, transparent, #f97316, transparent)",
+      "grid_fade": "linear-gradient(to bottom, #27272a 1px, transparent 1px)"
+    },
+    "usage_rules": [
+      "Backgrounds: Use Zinc-950 (#09090b) as the main canvas. Avoid pure black.",
+      "Cards: Use Zinc-900 (#18181b) with a 1px Zinc-800 border.",
+      "Interactive: Hover states should brighten the background (Zinc-800) or add a colored border glow.",
+      "Data Visualization: Use the 'accent' palette for charts. Ensure colorblind accessibility.",
+      "Text: Never use pure white (#ffffff) for body text; use Zinc-100 (#f4f4f5). Use pure white only for active headers."
+    ]
+  },
+  "layout_strategy": {
+    "grid_system": "Bento Grid Mode B (High Density)",
+    "container_style": "fluid",
+    "spacing": {
+      "section_gap": "gap-4 md:gap-6",
+      "internal_padding": "p-4 md:p-6",
+      "dashboard_grid": "grid grid-cols-1 md:grid-cols-12 gap-4"
+    },
+    "sidebar": {
+      "width": "w-64",
+      "behavior": "collapsible",
+      "style": "border-r border-border bg-background"
+    },
+    "dashboard_rules": [
+      "Use 'col-span-12 md:col-span-3' for summary cards.",
+      "Use 'col-span-12 md:col-span-9' for main timeline/charts.",
+      "Use 'col-span-12 md:col-span-4' for lists/feeds.",
+      "Every widget must have a 1px border. No rounded corners > 4px.",
+      "Maximize vertical space. Use 'h-full' to stretch widgets."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": [
+      "Grid Borders: Use 'border-r border-b border-border/40' for data tables.",
+      "Tracing Beam: Use animated gradient borders for active analysis panels.",
+      "Glassmorphism: Use ONLY for floating tooltips or modal overlays (backdrop-blur-md bg-black/60). NEVER for main data cards."
+    ],
+    "decorations": [
+      "Scanlines: Optional overlay opacity-5 for 'Retro-Futurism' mode in terminal views.",
+      "Corner Accents: Add 2px solid accents at the corners of critical alert boxes."
+    ],
+    "motion": {
+      "hover": "transition-all duration-200 ease-out hover:border-primary/50",
+      "entrance": "animate-in fade-in slide-in-from-bottom-4 duration-500",
+      "chart_load": "draw-line-chart duration-1000"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 rounded-sm font-medium tracking-wide uppercase text-sm h-10 px-6",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded-sm font-medium h-10 px-4",
+      "ghost": "hover:bg-accent hover:text-accent-foreground rounded-sm",
+      "outline": "border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-sm"
+    },
+    "cards": {
+      "default": "rounded-sm border border-border bg-card text-card-foreground shadow-sm",
+      "interactive": "group relative overflow-hidden rounded-sm border border-border bg-card transition-colors hover:border-primary/50"
+    },
+    "inputs": {
+      "default": "flex h-10 w-full rounded-sm border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    },
+    "tables": {
+      "header": "bg-muted/50 font-mono text-xs uppercase tracking-wider text-muted-foreground",
+      "row": "hover:bg-muted/50 transition-colors border-b border-border",
+      "cell": "p-4 align-middle font-mono text-sm"
+    }
+  },
+  "media": {
+    "image_style": "grayscale hover:grayscale-0 transition-all duration-500 contrast-125",
+    "icons": "Lucide React (default), Phosphor Icons (for dashboard density)",
+    "image_assets": {
+      "hero_background": "https://images.unsplash.com/photo-1765218933298-dc55fdfb517a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwzfHxpbmR1c3RyaWFsJTIwYXV0b21hdGVkJTIwZmFjdG9yeSUyMG1hY2hpbmVyeXxlbnwwfHx8fDE3NzM1MTE1NzZ8MA&ixlib=rb-4.1.0&q=85",
+      "machinery_detail": "https://images.unsplash.com/photo-1764835994645-3faa2c40f708?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwyfHxpbmR1c3RyaWFsJTIwYXV0b21hdGVkJTIwZmFjdG9yeSUyMG1hY2hpbmVyeXxlbnwwfHx8fDE3NzM1MTE1NzZ8MA&ixlib=rb-4.1.0&q=85",
+      "abstract_data": "https://images.unsplash.com/photo-1684610529682-553625a1ffed?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGN5YmVyJTIwZGF0YSUyMHZpc3VhbGl6YXRpb24lMjB0ZWNobm9sb2d5JTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzM1MTE1ODR8MA&ixlib=rb-4.1.0&q=85",
+      "login_bg": "https://images.unsplash.com/photo-1771013304380-dfaf9f928de6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMGN5YmVyJTIwZGF0YSUyMHZpc3VhbGl6YXRpb24lMjB0ZWNobm9sb2d5JTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzM1MTE1ODR8MA&ixlib=rb-4.1.0&q=85"
+    }
+  },
+  "chart_library": {
+    "standard": "Recharts (via Shadcn Charts)",
+    "complex_causal": "React Flow (for node graphs) or Visx",
+    "3d": "None (Focus on 2D density)",
+    "preferences": {
+      "grid_lines": "stroke-border stroke-[1] stroke-dasharray-4",
+      "tooltip": "bg-background border border-border shadow-xl rounded-sm p-2 text-xs font-mono",
+      "colors": ["#f97316", "#3b82f6", "#22c55e", "#eab308", "#ef4444"]
+    }
+  },
+  "accessibility": {
+    "contrast": "WCAG AA Compliant",
+    "focus_states": "visible focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
+    "reduced_motion": "respect-media-query"
+  },
+  "instructions_to_main_agent": [
+    "1. IMPLEMENTATION: Start by setting up the Tailwind theme with the specified colors and fonts.",
+    "2. COMPONENTS: Customize Shadcn components to remove excessive rounding (set radius to 0.125rem or 0.25rem).",
+    "3. LAYOUT: Use the 'Bento' grid system for the dashboard. Avoid whitespace in the main data view.",
+    "4. CHARTS: Use Recharts for all time-series and anomaly charts. Customize the tooltips to be 'technical' (mono font, strict borders).",
+    "5. REPORT: The RCA Report Generator should output a clean, print-friendly layout (white background option).",
+    "6. TESTING: Add 'data-testid' to all interactive elements."
+  ],
+  "universal_guidelines": [
+    "Avoid generic 'AI slop' gradients.",
+    "Do not center-align dashboard content.",
+    "Use layered z-index depth.",
+    "No transition: all.",
+    "Micro-animations on interaction.",
+    "Use sonner for toasts.",
+    "Components must use named exports.",
+    "Pages must use default exports."
+  ]
+}
