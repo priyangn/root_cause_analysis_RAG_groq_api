@@ -269,32 +269,32 @@ async def list_analyses(user_id: str = Depends(get_current_user)):
 async def chat(message: ChatMessage, user_id: str = Depends(get_current_user)):
     try:
         analysis_context = ""
+        root_cause_info = "No analysis selected"
         
         if message.analysis_id:
             analysis = await db.analyses.find_one(
                 {"id": message.analysis_id, "user_id": user_id},
                 {"_id": 0}
             )
-            if analysis:
-                analysis_context = f"""
-Current Analysis Context:
-- Root Cause: {analysis.get('root_cause', {}).get('root_cause', 'Not determined')}
-- Confidence: {analysis.get('root_cause', {}).get('confidence_score', 0)}
-- Top Anomalies: {len(analysis.get('anomalies', []))} detected
-"""
+            if analysis and analysis.get('root_cause'):
+                root_cause = analysis.get('root_cause', {})
+                root_cause_info = f"""Root Cause: {root_cause.get('root_cause', 'Not determined')}
+Confidence: {root_cause.get('confidence_score', 0) * 100:.0f}%
+Anomalies Detected: {len(analysis.get('anomalies', []))}"""
         
-        agent = BaseAgent()
-        chat_session = await agent.create_chat(
-            f"""You are an AI assistant for a Machine Failure Root Cause Analysis platform.
-Help users understand their analysis results and answer questions about machine failures.
-
-{analysis_context}
-
-Provide clear, technical answers based on the analysis data.""",
-            f"chat_{user_id}_{message.analysis_id or 'general'}"
-        )
-        
-        response = await agent.send_message(chat_session, message.message)
+        try:
+            agent = BaseAgent()
+            chat_session = await agent.create_chat(
+                "You are a technical assistant. Provide concise answers about machine failure analysis.",
+                f"chat_{user_id}_{message.analysis_id or 'general'}"
+            )
+            
+            query = f"Context: {root_cause_info}\n\nQuestion: {message.message}\n\nProvide a brief answer (2-3 sentences)."
+            response = await agent.send_message(chat_session, query)
+            
+        except Exception as llm_error:
+            logger.error(f"LLM error in chat: {llm_error}")
+            response = f"Based on the analysis: {root_cause_info}\n\nRegarding your question about '{message.message}', please refer to the analysis results in the Overview tab for detailed information."
         
         await db.chat_messages.insert_one({
             "id": str(uuid.uuid4()),
@@ -309,7 +309,10 @@ Provide clear, technical answers based on the analysis data.""",
         
     except Exception as e:
         logger.error(f"Error in chat: {e}")
-        raise HTTPException(status_code=500, detail="Chat failed")
+        return ChatResponse(
+            response="I'm currently experiencing technical difficulties. Please refer to the analysis results displayed on the dashboard.",
+            sources=None
+        )
 
 @api_router.get("/reports/{analysis_id}/download")
 async def download_report(analysis_id: str, user_id: str = Depends(get_current_user)):
