@@ -76,7 +76,12 @@ export default function LoginPage() {
             disabled={loading}
             data-testid="login-submit-button"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <span>Signing in...</span>
+              </div>
+            ) : 'Sign In'}
           </Button>
         </form>
 

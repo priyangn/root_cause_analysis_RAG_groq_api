@@ -36,17 +36,27 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
-    const response = await authAPI.login({ email, password });
-    localStorage.setItem('token', response.data.access_token);
-    setUser(response.data.user);
-    return response.data;
+    try {
+      const response = await authAPI.login({ email, password });
+      localStorage.setItem('token', response.data.access_token);
+      setUser(response.data.user);
+      return response.data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const register = async (email, password, full_name) => {
-    const response = await authAPI.register({ email, password, full_name });
-    localStorage.setItem('token', response.data.access_token);
-    setUser(response.data.user);
-    return response.data;
+    try {
+      const response = await authAPI.register({ email, password, full_name });
+      localStorage.setItem('token', response.data.access_token);
+      setUser(response.data.user);
+      return response.data;
+    } catch (error) {
+      console.error('Register error:', error);
+      throw error;
+    }
   };
 
   const logout = () => {

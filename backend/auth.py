@@ -9,7 +9,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'rca-platform-secret-key-change-in-pro
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Optimize bcrypt for faster login (4 rounds instead of default 12)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=4)
 security = HTTPBearer()
 
 def verify_password(plain_password, hashed_password):
