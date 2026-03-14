@@ -40,6 +40,7 @@ export const analysisAPI = {
   }),
   getAnalysis: (analysisId) => api.get(`/analysis/${analysisId}`),
   listAnalyses: () => api.get('/analysis'),
+  deleteAnalysis: (analysisId) => api.delete(`/analysis/${analysisId}`),
 };
 
 export const chatAPI = {

@@ -284,6 +284,15 @@ async def list_analyses(user_id: str = Depends(get_current_user)):
     
     return analyses
 
+@api_router.delete("/analysis/{analysis_id}")
+async def delete_analysis(analysis_id: str, user_id: str = Depends(get_current_user)):
+    result = await db.analyses.delete_one({"id": analysis_id, "user_id": user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    return {"message": "Analysis deleted successfully"}
+
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage, user_id: str = Depends(get_current_user)):
     try:
@@ -335,6 +344,8 @@ Anomalies Detected: {len(analysis.get('anomalies', []))}"""
 
 @api_router.get("/reports/{analysis_id}/download")
 async def download_report(analysis_id: str, user_id: str = Depends(get_current_user)):
+    from pdf_generator import PDFReportGenerator
+    
     analysis = await db.analyses.find_one(
         {"id": analysis_id, "user_id": user_id},
         {"_id": 0}
@@ -343,46 +354,21 @@ async def download_report(analysis_id: str, user_id: str = Depends(get_current_u
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     
-    report_content = f"""# Root Cause Analysis Report
-
-## Analysis ID: {analysis_id}
-## Date: {analysis.get('created_at', '')}
-
-## Executive Summary
-{analysis.get('root_cause', {}).get('root_cause', 'Not determined')}
-
-Confidence Score: {analysis.get('root_cause', {}).get('confidence_score', 0) * 100}%
-
-## Evidence
-"""
+    # Generate PDF
+    pdf_path = f"/app/backend/uploads/RCA_Report_{analysis_id}.pdf"
     
-    for evidence in analysis.get('root_cause', {}).get('evidence', []):
-        report_content += f"- {evidence}\\n"
-    
-    report_content += "\\n## Preventive Actions\\n"
-    for action in analysis.get('root_cause', {}).get('preventive_actions', []):
-        report_content += f"- {action}\\n"
-    
-    report_content += f"""
-## Detected Anomalies
-Total: {len(analysis.get('anomalies', []))}
-
-## ML Validation Results
-"""
-    
-    for ml_result in analysis.get('ml_results', []):
-        report_content += f"\\n### {ml_result.get('model_name')}\\n"
-        report_content += f"Accuracy: {ml_result.get('accuracy', 0) * 100}%\\n"
-    
-    report_path = UPLOAD_DIR / f"report_{analysis_id}.md"
-    with open(report_path, 'w') as f:
-        f.write(report_content)
-    
-    return FileResponse(
-        path=report_path,
-        filename=f"RCA_Report_{analysis_id}.md",
-        media_type="text/markdown"
-    )
+    try:
+        pdf_gen = PDFReportGenerator(analysis, pdf_path)
+        pdf_gen.generate()
+        
+        return FileResponse(
+            path=pdf_path,
+            filename=f"CauseSense_RCA_Report_{analysis_id}.pdf",
+            media_type="application/pdf"
+        )
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate report")
 
 app.include_router(api_router)
 

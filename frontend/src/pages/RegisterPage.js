@@ -46,9 +46,9 @@ export default function RegisterPage() {
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-10 h-10 text-primary" />
-            <h1 className="text-3xl font-bold font-heading tracking-tight text-gradient">RCA PLATFORM</h1>
+            <h1 className="text-3xl font-bold font-heading tracking-tight text-gradient">CauseSense AI</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-mono uppercase tracking-wider">Create Account</p>
+          <p className="text-muted-foreground text-sm font-mono uppercase tracking-wider">AI Root Cause Intelligence</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6" data-testid="register-form">

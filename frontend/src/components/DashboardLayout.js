@@ -23,8 +23,8 @@ export const DashboardLayout = ({ children }) => {
                 <Activity className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold">RCA Platform</h1>
-                <p className="text-xs text-muted-foreground">Root Cause Analysis</p>
+                <h1 className="text-lg font-semibold">CauseSense AI</h1>
+                <p className="text-xs text-muted-foreground">Root Cause Intelligence</p>
               </div>
             </div>
             

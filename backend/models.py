@@ -65,6 +65,7 @@ class MLModelResult(BaseModel):
     model_name: str
     accuracy: float
     feature_importance: Dict[str, float]
+    confusion_matrix: Optional[Dict[str, int]] = None
     predictions: List[Dict[str, Any]]
 
 class CausalParameter(BaseModel):

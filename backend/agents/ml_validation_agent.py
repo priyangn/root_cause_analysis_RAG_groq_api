@@ -1,5 +1,6 @@
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
 from xgboost import XGBClassifier
 import pandas as pd
 import numpy as np
@@ -77,6 +78,18 @@ class MLValidationAgent:
                     model.fit(X_train, y_train)
                     accuracy = model.score(X_test, y_test)
                     
+                    # Get predictions for confusion matrix
+                    y_pred = model.predict(X_test)
+                    cm = confusion_matrix(y_test, y_pred)
+                    
+                    # Format confusion matrix
+                    confusion_matrix_data = {
+                        "true_negative": int(cm[0][0]) if cm.shape[0] > 0 else 0,
+                        "false_positive": int(cm[0][1]) if cm.shape[0] > 1 else 0,
+                        "false_negative": int(cm[1][0]) if cm.shape[1] > 0 else 0,
+                        "true_positive": int(cm[1][1]) if cm.shape[1] > 1 else 0
+                    }
+                    
                     if hasattr(model, 'feature_importances_'):
                         feature_importance = dict(zip(
                             X.columns,
@@ -93,6 +106,7 @@ class MLValidationAgent:
                         "model_name": model_name,
                         "accuracy": float(accuracy),
                         "feature_importance": feature_importance,
+                        "confusion_matrix": confusion_matrix_data,
                         "predictions": []
                     })
                 except Exception as e:
@@ -115,6 +129,12 @@ class MLValidationAgent:
                     "load": 0.17,
                     "rpm": 0.10
                 },
+                "confusion_matrix": {
+                    "true_negative": 45,
+                    "false_positive": 5,
+                    "false_negative": 8,
+                    "true_positive": 42
+                },
                 "predictions": []
             },
             {
@@ -125,6 +145,12 @@ class MLValidationAgent:
                     "vibration": 0.35,
                     "pressure": 0.15,
                     "load": 0.12
+                },
+                "confusion_matrix": {
+                    "true_negative": 47,
+                    "false_positive": 3,
+                    "false_negative": 6,
+                    "true_positive": 44
                 },
                 "predictions": []
             }

@@ -87,6 +87,24 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDeleteAnalysis = async (analysisId, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this analysis?')) {
+      return;
+    }
+    
+    try {
+      await analysisAPI.deleteAnalysis(analysisId);
+      toast.success('Analysis deleted');
+      loadAnalyses();
+      if (currentAnalysis?.id === analysisId) {
+        setCurrentAnalysis(null);
+      }
+    } catch (error) {
+      toast.error('Failed to delete analysis');
+    }
+  };
+
   const startAnalysis = async () => {
     if (selectedFiles.length === 0) {
       toast.error('Please select at least one file');
@@ -179,7 +197,7 @@ export default function DashboardPage() {
       <div className="space-y-6" data-testid="dashboard">
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-2">Root Cause Analysis</h2>
-          <p className="text-muted-foreground text-sm">AI-Powered Machine Failure Diagnosis & Process Data Analysis</p>
+          <p className="text-muted-foreground text-sm">CauseSense AI - Machine Failure Diagnosis & Process Data Analysis</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -586,19 +604,53 @@ export default function DashboardPage() {
                                 </div>
                               </div>
                               
-                              <div>
-                                <span className="metric-label mb-2 block">Feature Importance</span>
-                                <div className="space-y-2">
-                                  {Object.entries(result.feature_importance || {}).map(([feature, importance]) => (
-                                    <div key={feature}>
-                                      <div className="flex items-center justify-between text-xs mb-1">
-                                        <span className="font-mono">{feature}</span>
-                                        <span className="font-mono font-bold">{(importance * 100).toFixed(0)}%</span>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <span className="metric-label mb-2 block">Feature Importance</span>
+                                  <div className="space-y-2">
+                                    {Object.entries(result.feature_importance || {}).map(([feature, importance]) => (
+                                      <div key={feature}>
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                          <span className="font-mono">{feature}</span>
+                                          <span className="font-mono font-bold">{(importance * 100).toFixed(0)}%</span>
+                                        </div>
+                                        <Progress value={importance * 100} className="h-2" />
                                       </div>
-                                      <Progress value={importance * 100} className="h-2" />
-                                    </div>
-                                  ))}
+                                    ))}
+                                  </div>
                                 </div>
+
+                                {result.confusion_matrix && (
+                                  <div>
+                                    <span className="metric-label mb-2 block">Confusion Matrix</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="p-3 rounded-md bg-accent/10 border border-accent/20 text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">True Negative</div>
+                                        <div className="text-2xl font-mono font-bold text-accent">
+                                          {result.confusion_matrix.true_negative}
+                                        </div>
+                                      </div>
+                                      <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">False Positive</div>
+                                        <div className="text-2xl font-mono font-bold text-destructive">
+                                          {result.confusion_matrix.false_positive}
+                                        </div>
+                                      </div>
+                                      <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">False Negative</div>
+                                        <div className="text-2xl font-mono font-bold text-destructive">
+                                          {result.confusion_matrix.false_negative}
+                                        </div>
+                                      </div>
+                                      <div className="p-3 rounded-md bg-accent/10 border border-accent/20 text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">True Positive</div>
+                                        <div className="text-2xl font-mono font-bold text-accent">
+                                          {result.confusion_matrix.true_positive}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -680,13 +732,24 @@ export default function DashboardPage() {
                         {new Date(analysis.created_at).toLocaleString()}
                       </span>
                     </div>
-                    <span className={`status-badge ml-2 ${
-                      analysis.status === 'completed' ? 'bg-accent/20 text-accent' : 
-                      analysis.status === 'processing' ? 'bg-primary/20 text-primary' :
-                      'bg-destructive/20 text-destructive'
-                    }`}>
-                      {analysis.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`status-badge ${
+                        analysis.status === 'completed' ? 'bg-accent/20 text-accent' : 
+                        analysis.status === 'processing' ? 'bg-primary/20 text-primary' :
+                        'bg-destructive/20 text-destructive'
+                      }`}>
+                        {analysis.status}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleDeleteAnalysis(analysis.id, e)}
+                        className="h-6 w-6 p-0"
+                        data-testid={`delete-analysis-${analysis.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                   {analysis.progress < 100 && (
                     <Progress value={analysis.progress} className="h-1 mt-2" />

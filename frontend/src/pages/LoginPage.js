@@ -38,9 +38,9 @@ export default function LoginPage() {
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
               <Activity className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">RCA Platform</h1>
+            <h1 className="text-2xl font-bold tracking-tight">CauseSense AI</h1>
           </div>
-          <p className="text-sm text-muted-foreground">Machine Failure Root Cause Analysis</p>
+          <p className="text-sm text-muted-foreground">AI Root Cause Intelligence Platform</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
@@ -92,15 +92,6 @@ export default function LoginPage() {
               Create account
             </Link>
           </p>
-        </div>
-
-        <div className="mt-6 p-3 rounded-md bg-primary/5 border border-primary/10">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              Demo credentials: testuser@example.com / test123
-            </p>
-          </div>
         </div>
       </Card>
     </div>
