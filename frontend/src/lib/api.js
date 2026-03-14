@@ -34,7 +34,10 @@ export const uploadAPI = {
 };
 
 export const analysisAPI = {
-  startAnalysis: (fileIds) => api.post('/analysis/start', { file_ids: fileIds }),
+  startAnalysis: (fileIds, projectName) => api.post('/analysis/start', { 
+    file_ids: fileIds,
+    project_name: projectName 
+  }),
   getAnalysis: (analysisId) => api.get(`/analysis/${analysisId}`),
   listAnalyses: () => api.get('/analysis'),
 };
