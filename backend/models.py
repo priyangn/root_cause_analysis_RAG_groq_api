@@ -44,6 +44,7 @@ class FileUploadResponse(BaseModel):
 
 class AnalysisRequest(BaseModel):
     file_ids: List[str]
+    project_name: Optional[str] = "Untitled Analysis"
 
 class HypothesisItem(BaseModel):
     id: str
@@ -53,11 +54,12 @@ class HypothesisItem(BaseModel):
     probability: float
 
 class AnomalyItem(BaseModel):
-    timestamp: str
+    timestamp: Optional[str] = None
     parameter: str
     value: float
     threshold: float
     severity: str
+    row_index: Optional[int] = None
 
 class MLModelResult(BaseModel):
     model_name: str
@@ -81,13 +83,17 @@ class AnalysisResult(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     file_ids: List[str]
+    project_name: str = "Untitled Analysis"
     status: str
     progress: int
+    current_step: Optional[str] = None
+    estimated_time_remaining: Optional[int] = None
     anomalies: Optional[List[AnomalyItem]] = None
     hypotheses: Optional[List[HypothesisItem]] = None
     ml_results: Optional[List[MLModelResult]] = None
     causal_analysis: Optional[List[CausalParameter]] = None
     root_cause: Optional[RootCauseResult] = None
+    visualizations: Optional[Dict[str, Any]] = None
     created_at: str
     updated_at: str
 

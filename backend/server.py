@@ -164,7 +164,7 @@ async def delete_upload(file_id: str, user_id: str = Depends(get_current_user)):
     
     return {"message": "File deleted successfully"}
 
-async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[str]):
+async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[str], project_name: str):
     try:
         file_docs = await db.uploaded_files.find(
             {"id": {"$in": file_ids}, "user_id": user_id},
@@ -182,12 +182,14 @@ async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[s
         
         pipeline = AnalysisPipeline(user_id, analysis_id)
         
-        async def update_progress(progress: int, message: str):
+        async def update_progress(progress: int, message: str, estimated_seconds: int = 0):
             await db.analyses.update_one(
                 {"id": analysis_id},
                 {"$set": {
                     "progress": progress,
                     "status": "processing" if progress < 100 else "completed",
+                    "current_step": message,
+                    "estimated_time_remaining": estimated_seconds,
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
@@ -199,11 +201,14 @@ async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[s
             {"$set": {
                 "status": "completed",
                 "progress": 100,
+                "current_step": "Complete",
+                "estimated_time_remaining": 0,
                 "anomalies": result["anomalies"],
                 "hypotheses": result["hypotheses"],
                 "ml_results": result["ml_results"],
                 "causal_analysis": result["causal_analysis"],
                 "root_cause": result["root_cause"],
+                "visualizations": result.get("visualizations", {}),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
@@ -215,6 +220,7 @@ async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[s
             {"$set": {
                 "status": "failed",
                 "progress": 0,
+                "current_step": f"Error: {str(e)}",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
@@ -231,20 +237,24 @@ async def start_analysis(
         "id": analysis_id,
         "user_id": user_id,
         "file_ids": request.file_ids,
+        "project_name": request.project_name or "Untitled Analysis",
         "status": "processing",
         "progress": 0,
+        "current_step": "Starting analysis...",
+        "estimated_time_remaining": 30,
         "anomalies": None,
         "hypotheses": None,
         "ml_results": None,
         "causal_analysis": None,
         "root_cause": None,
+        "visualizations": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.analyses.insert_one(analysis_doc)
     
-    background_tasks.add_task(run_analysis_pipeline, analysis_id, user_id, request.file_ids)
+    background_tasks.add_task(run_analysis_pipeline, analysis_id, user_id, request.file_ids, request.project_name or "Untitled Analysis")
     
     return AnalysisResponse(
         id=analysis_id,

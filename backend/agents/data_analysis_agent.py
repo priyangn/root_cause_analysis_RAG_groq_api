@@ -49,6 +49,13 @@ Provide a technical analysis of these findings and identify potential failure in
             if df.empty:
                 continue
             
+            # Check for timestamp column
+            timestamp_col = None
+            for col in df.columns:
+                if 'time' in str(col).lower() or 'date' in str(col).lower():
+                    timestamp_col = col
+                    break
+            
             numeric_cols = df.select_dtypes(include=[np.number]).columns
             
             for col in numeric_cols:
@@ -61,13 +68,24 @@ Provide a technical analysis of these findings and identify potential failure in
                         anomaly_indices = np.where(z_scores > 3)[0]
                         
                         for idx in anomaly_indices[:10]:
-                            anomalies.append({
-                                "timestamp": str(df.index[idx]) if hasattr(df.index, '__getitem__') else str(idx),
+                            anomaly_data = {
                                 "parameter": col,
                                 "value": float(df[col].iloc[idx]),
                                 "threshold": float(mean + 3 * std),
-                                "severity": "high" if z_scores.iloc[idx] > 4 else "medium"
-                            })
+                                "severity": "high" if z_scores.iloc[idx] > 4 else "medium",
+                                "row_index": int(idx)
+                            }
+                            
+                            # Add timestamp if available
+                            if timestamp_col and timestamp_col in df.columns:
+                                try:
+                                    anomaly_data["timestamp"] = str(df[timestamp_col].iloc[idx])
+                                except:
+                                    anomaly_data["timestamp"] = f"Row {idx}"
+                            else:
+                                anomaly_data["timestamp"] = str(df.index[idx]) if hasattr(df.index, '__getitem__') else f"Row {idx}"
+                            
+                            anomalies.append(anomaly_data)
         
         return anomalies[:20]
     
