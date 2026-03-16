@@ -5,21 +5,55 @@ from typing import Dict, List, Any
 class VisualizationGenerator:
     @staticmethod
     def generate_time_series_data(dataframes: List[pd.DataFrame]) -> List[Dict[str, Any]]:
-        """Generate time series visualization data"""
+        """Generate time series visualization data with proper timestamps"""
         chart_data = []
         
         for df in dataframes:
-            if df.empty or len(df) > 100:
-                df = df.head(100)  # Limit to 100 points
+            if df.empty:
+                continue
             
-            numeric_cols = df.select_dtypes(include=[np.number]).columns[:5]  # Max 5 series
+            # Limit data points for performance
+            if len(df) > 100:
+                df = df.iloc[::len(df)//100]  # Sample evenly
+            
+            # Find timestamp column
+            timestamp_col = None
+            for col in df.columns:
+                if 'time' in str(col).lower() or 'date' in str(col).lower():
+                    timestamp_col = col
+                    break
+            
+            # Get numeric columns (max 5 for clarity)
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()[:5]
+            
+            if not numeric_cols:
+                continue
             
             for idx, row in df.iterrows():
-                data_point = {"index": int(idx) if isinstance(idx, (int, np.integer)) else str(idx)}
-                for col in numeric_cols:
-                    data_point[str(col)] = float(row[col]) if pd.notna(row[col]) else 0
-                chart_data.append(data_point)
+                data_point = {}
                 
+                # Add timestamp if available, otherwise use index
+                if timestamp_col and timestamp_col in df.columns:
+                    try:
+                        # Try to format timestamp nicely
+                        ts_value = row[timestamp_col]
+                        if pd.notna(ts_value):
+                            data_point["time"] = str(ts_value)
+                        else:
+                            data_point["time"] = str(idx)
+                    except:
+                        data_point["time"] = str(idx)
+                else:
+                    data_point["time"] = str(idx)
+                
+                # Add numeric values
+                for col in numeric_cols:
+                    if pd.notna(row[col]):
+                        data_point[str(col)] = float(row[col])
+                
+                if len(data_point) > 1:  # Only add if has data beyond timestamp
+                    chart_data.append(data_point)
+            
             if chart_data:
                 break
         

@@ -113,7 +113,10 @@ async def forgot_password(request: PasswordResetRequest):
     user = await db.users.find_one({"email": request.email}, {"_id": 0})
     if not user:
         # Don't reveal if user exists or not for security
-        return {"message": "If the email exists, a reset token has been generated"}
+        return {
+            "message": "If the email exists, a reset token has been generated",
+            "reset_token": None
+        }
     
     # Generate reset token
     reset_token = create_reset_token()
@@ -128,11 +131,12 @@ async def forgot_password(request: PasswordResetRequest):
         }}
     )
     
-    # In production, send email here. For now, return token (development only)
+    # Return token in response (in production, send via email instead)
     return {
-        "message": "Password reset token generated",
+        "message": "Password reset token generated successfully",
         "reset_token": reset_token,
-        "note": "In production, this would be sent via email. Use this token with /auth/reset-password"
+        "expires_in_hours": 1,
+        "note": "In production, this token would be sent via email"
     }
 
 @api_router.post("/auth/reset-password")

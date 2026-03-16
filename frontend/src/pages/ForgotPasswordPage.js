@@ -23,17 +23,19 @@ export default function ForgotPasswordPage() {
     try {
       const response = await axios.post(`${BACKEND_URL}/api/auth/forgot-password`, { email });
       
-      if (response.data.reset_token) {
-        // Development mode: show token
+      // Check if response has reset_token (development mode)
+      if (response.data && response.data.reset_token) {
         setResetToken(response.data.reset_token);
-        toast.success('Reset token generated! Copy it from below.');
+        toast.success('Reset token generated! Enter it below to reset your password.');
         setStep(2);
       } else {
-        toast.success(response.data.message);
+        // Production mode - token sent via email
+        toast.success('If the email exists, a reset token has been sent.');
         setStep(2);
       }
     } catch (error) {
-      toast.error('Failed to process request');
+      console.error('Reset request error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to process request. Please try again.');
     } finally {
       setLoading(false);
     }

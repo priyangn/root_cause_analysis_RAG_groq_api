@@ -19,8 +19,16 @@ export default function DashboardPage() {
   const [analyses, setAnalyses] = useState([]);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
+  const [hiddenLines, setHiddenLines] = useState({});
   const fileInputRef = useRef(null);
   const pollInterval = useRef(null);
+
+  const handleLegendClick = (dataKey) => {
+    setHiddenLines(prev => ({
+      ...prev,
+      [dataKey]: !prev[dataKey]
+    }));
+  };
 
   useEffect(() => {
     loadUploadedFiles();
@@ -390,11 +398,18 @@ export default function DashboardPage() {
 
                       {currentAnalysis.visualizations?.time_series && currentAnalysis.visualizations.time_series.length > 0 && (
                         <div className="p-4 rounded-md bg-secondary border border-border">
-                          <h5 className="metric-label mb-4">Time-Series Data</h5>
+                          <h5 className="metric-label mb-4">Time-Series Data (Click legends to show/hide)</h5>
                           <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={currentAnalysis.visualizations.time_series}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis dataKey="index" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                              <XAxis 
+                                dataKey="time" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                tick={{ fontSize: 10 }}
+                                angle={-45}
+                                textAnchor="end"
+                                height={80}
+                              />
                               <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
                               <Tooltip 
                                 contentStyle={{ 
@@ -403,9 +418,12 @@ export default function DashboardPage() {
                                   borderRadius: '6px'
                                 }} 
                               />
-                              <Legend />
+                              <Legend 
+                                onClick={(e) => handleLegendClick(e.dataKey)}
+                                wrapperStyle={{ cursor: 'pointer' }}
+                              />
                               {Object.keys(currentAnalysis.visualizations.time_series[0] || {})
-                                .filter(key => key !== 'index')
+                                .filter(key => key !== 'time')
                                 .slice(0, 5)
                                 .map((key, idx) => (
                                   <Line 
@@ -414,10 +432,15 @@ export default function DashboardPage() {
                                     dataKey={key} 
                                     stroke={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][idx % 5]} 
                                     strokeWidth={2}
+                                    hide={hiddenLines[key]}
+                                    dot={false}
                                   />
                                 ))}
                             </LineChart>
                           </ResponsiveContainer>
+                          <p className="text-xs text-muted-foreground mt-2 text-center">
+                            💡 Click on parameter names in the legend to show/hide data series
+                          </p>
                         </div>
                       )}
 
