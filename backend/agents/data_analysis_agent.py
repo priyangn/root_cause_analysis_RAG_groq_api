@@ -49,10 +49,11 @@ Provide a technical analysis of these findings and identify potential failure in
             if df.empty:
                 continue
             
-            # Check for timestamp column
+            # Find timestamp column
             timestamp_col = None
             for col in df.columns:
-                if 'time' in str(col).lower() or 'date' in str(col).lower():
+                col_lower = str(col).lower()
+                if 'time' in col_lower or 'date' in col_lower:
                     timestamp_col = col
                     break
             
@@ -76,14 +77,17 @@ Provide a technical analysis of these findings and identify potential failure in
                                 "row_index": int(idx)
                             }
                             
-                            # Add timestamp if available
-                            if timestamp_col and timestamp_col in df.columns:
+                            # Preserve original timestamp from data
+                            if timestamp_col is not None and timestamp_col in df.columns:
                                 try:
-                                    anomaly_data["timestamp"] = str(df[timestamp_col].iloc[idx])
-                                except:
+                                    original_timestamp = df[timestamp_col].iloc[idx]
+                                    # Keep original format - don't convert
+                                    anomaly_data["timestamp"] = str(original_timestamp)
+                                except Exception as e:
+                                    logger.error(f"Error reading timestamp: {e}")
                                     anomaly_data["timestamp"] = f"Row {idx}"
                             else:
-                                anomaly_data["timestamp"] = str(df.index[idx]) if hasattr(df.index, '__getitem__') else f"Row {idx}"
+                                anomaly_data["timestamp"] = f"Row {idx}"
                             
                             anomalies.append(anomaly_data)
         

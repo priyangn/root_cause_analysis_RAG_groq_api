@@ -12,13 +12,6 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class PasswordResetRequest(BaseModel):
-    email: str
-
-class PasswordReset(BaseModel):
-    token: str
-    new_password: str
-
 class UserResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str

@@ -5,21 +5,23 @@ from typing import Dict, List, Any
 class VisualizationGenerator:
     @staticmethod
     def generate_time_series_data(dataframes: List[pd.DataFrame]) -> List[Dict[str, Any]]:
-        """Generate time series visualization data with proper timestamps"""
+        """Generate time series visualization data with original timestamps preserved"""
         chart_data = []
         
         for df in dataframes:
             if df.empty:
                 continue
             
-            # Limit data points for performance
+            # Sample data if too large (keep every nth row to get ~50-100 points)
             if len(df) > 100:
-                df = df.iloc[::len(df)//100]  # Sample evenly
+                step = len(df) // 100
+                df = df.iloc[::step].copy()
             
-            # Find timestamp column
+            # Find timestamp/date column
             timestamp_col = None
             for col in df.columns:
-                if 'time' in str(col).lower() or 'date' in str(col).lower():
+                col_lower = str(col).lower()
+                if 'time' in col_lower or 'date' in col_lower:
                     timestamp_col = col
                     break
             
@@ -29,35 +31,39 @@ class VisualizationGenerator:
             if not numeric_cols:
                 continue
             
+            # Build chart data preserving original timestamps
             for idx, row in df.iterrows():
                 data_point = {}
                 
-                # Add timestamp if available, otherwise use index
-                if timestamp_col and timestamp_col in df.columns:
+                # Use original timestamp value from dataset
+                if timestamp_col is not None and timestamp_col in df.columns:
                     try:
-                        # Try to format timestamp nicely
-                        ts_value = row[timestamp_col]
-                        if pd.notna(ts_value):
-                            data_point["time"] = str(ts_value)
+                        original_ts = row[timestamp_col]
+                        if pd.notna(original_ts):
+                            # Keep original format exactly as in uploaded file
+                            data_point["time"] = str(original_ts)
                         else:
-                            data_point["time"] = str(idx)
-                    except:
-                        data_point["time"] = str(idx)
+                            data_point["time"] = f"Row {idx}"
+                    except Exception as e:
+                        logger.error(f"Error reading timestamp at row {idx}: {e}")
+                        data_point["time"] = f"Row {idx}"
                 else:
-                    data_point["time"] = str(idx)
+                    # No timestamp column - use row number
+                    data_point["time"] = f"Row {idx}"
                 
                 # Add numeric values
                 for col in numeric_cols:
                     if pd.notna(row[col]):
                         data_point[str(col)] = float(row[col])
                 
-                if len(data_point) > 1:  # Only add if has data beyond timestamp
+                # Only add if has numeric data
+                if len(data_point) > 1:
                     chart_data.append(data_point)
             
             if chart_data:
-                break
+                break  # Use first dataframe with data
         
-        return chart_data[:50]  # Limit to 50 points
+        return chart_data[:50]  # Limit to 50 points for performance
     
     @staticmethod
     def generate_correlation_matrix(dataframes: List[pd.DataFrame]) -> Dict[str, Any]:
