@@ -106,20 +106,94 @@ async def get_me(user_id: str = Depends(get_current_user)):
         created_at=user["created_at"]
     )
 
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: PasswordResetRequest):
+    from auth import create_reset_token
+    
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if not user:
+        # Don't reveal if user exists or not for security
+        return {"message": "If the email exists, a reset token has been generated"}
+    
+    # Generate reset token
+    reset_token = create_reset_token()
+    reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store reset token in database
+    await db.users.update_one(
+        {"email": request.email},
+        {"$set": {
+            "reset_token": reset_token,
+            "reset_token_expires": reset_token_expires.isoformat()
+        }}
+    )
+    
+    # In production, send email here. For now, return token (development only)
+    return {
+        "message": "Password reset token generated",
+        "reset_token": reset_token,
+        "note": "In production, this would be sent via email. Use this token with /auth/reset-password"
+    }
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: PasswordReset):
+    from auth import get_password_hash
+    
+    # Find user with valid reset token
+    user = await db.users.find_one({
+        "reset_token": request.token
+    }, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Check if token is expired
+    if "reset_token_expires" in user:
+        expires = datetime.fromisoformat(user["reset_token_expires"])
+        if datetime.now(timezone.utc) > expires:
+            raise HTTPException(status_code=400, detail="Reset token has expired")
+    
+    # Update password and clear reset token
+    new_password_hash = get_password_hash(request.new_password)
+    await db.users.update_one(
+        {"reset_token": request.token},
+        {"$set": {
+            "password_hash": new_password_hash
+        },
+        "$unset": {
+            "reset_token": "",
+            "reset_token_expires": ""
+        }}
+    )
+    
+    return {"message": "Password reset successful"}
+
 @api_router.post("/upload", response_model=FileUploadResponse)
 async def upload_file(
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user)
 ):
     try:
+        # Check file size (200MB limit)
+        MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB in bytes
+        
+        # Read file content to check size
+        file_content = await file.read()
+        file_size = len(file_content)
+        
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is 200MB, your file is {file_size / (1024*1024):.1f}MB"
+            )
+        
         file_id = str(uuid.uuid4())
         file_extension = Path(file.filename).suffix
         file_path = UPLOAD_DIR / f"{file_id}{file_extension}"
         
+        # Write file content
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        file_size = file_path.stat().st_size
+            buffer.write(file_content)
         
         file_metadata = {
             "id": file_id,
@@ -141,6 +215,8 @@ async def upload_file(
             message="File uploaded successfully"
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error uploading file: {e}")
         raise HTTPException(status_code=500, detail="File upload failed")

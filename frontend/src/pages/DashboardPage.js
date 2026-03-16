@@ -204,6 +204,12 @@ export default function DashboardPage() {
                   />
                 </div>
 
+                <div className="p-3 rounded-md bg-primary/10 border border-primary/20">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Note:</strong> Maximum file size: 200MB per file
+                  </p>
+                </div>
+
                 <input
                   ref={fileInputRef}
                   type="file"

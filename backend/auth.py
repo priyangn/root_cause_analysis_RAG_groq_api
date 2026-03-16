@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 import os
+import secrets
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'rca-platform-secret-key-change-in-production')
 ALGORITHM = "HS256"
@@ -25,6 +26,10 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def create_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials

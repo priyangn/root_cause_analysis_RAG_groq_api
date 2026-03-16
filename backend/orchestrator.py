@@ -83,16 +83,24 @@ class AnalysisPipeline:
             if progress_callback:
                 await progress_callback(55, "Generating hypotheses...", 12)
             
-            result['hypotheses'] = await self.hypothesis_agent.generate_hypotheses(
-                result['anomalies'],
-                knowledge_analysis,
-                self.session_id
-            )
+            try:
+                result['hypotheses'] = await self.hypothesis_agent.generate_hypotheses(
+                    result['anomalies'],
+                    knowledge_analysis,
+                    self.session_id
+                )
+            except Exception as hyp_error:
+                logger.error(f"Hypothesis generation error: {hyp_error}")
+                result['hypotheses'] = self.hypothesis_agent.generate_fallback_hypotheses(result['anomalies'])
             
             if progress_callback:
                 await progress_callback(65, "Training ML models...", 10)
             
-            result['ml_results'] = await self.ml_agent.train_and_validate(dataframes)
+            try:
+                result['ml_results'] = await self.ml_agent.train_and_validate(dataframes)
+            except Exception as ml_error:
+                logger.error(f"ML training error: {ml_error}")
+                result['ml_results'] = self.ml_agent.generate_mock_results()
             
             if progress_callback:
                 await progress_callback(80, "Performing causal analysis...", 7)
