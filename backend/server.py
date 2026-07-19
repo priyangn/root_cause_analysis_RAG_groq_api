@@ -21,9 +21,16 @@ from agents.base_agent import BaseAgent
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL')
+db_name = os.environ.get('DB_NAME', 'causesense')
+if not mongo_url:
+    raise RuntimeError(
+        "MONGO_URL is not set. On Render, add MongoDB Atlas connection string "
+        "in Environment (e.g. mongodb+srv://user:pass@cluster.../causesense)."
+    )
+
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -44,7 +51,12 @@ async def root():
 
 @api_router.get("/health")
 async def health():
-    return {"status": "healthy", "database": "connected"}
+    try:
+        await client.admin.command("ping")
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Health check DB ping failed: {e}")
+        raise HTTPException(status_code=503, detail="database unavailable")
 
 @api_router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserCreate):
