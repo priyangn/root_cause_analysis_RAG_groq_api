@@ -1,6 +1,7 @@
 # Free-tier deploy on Render (no DigitalOcean payment).
 # MongoDB: use MongoDB Atlas M0 free cluster — set MONGO_URL in dashboard.
 # Docs: https://render.com/docs/blueprint-spec
+# Note: static sites have no plan field (always free). Web Docker services use plan: free.
 
 services:
   - type: web
@@ -25,10 +26,9 @@ services:
   - type: web
     name: causesense-web
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm ci --legacy-peer-deps && npm run build
-    staticPublishPath: build
+    staticPublishPath: ./build
     routes:
       - type: rewrite
         source: /*
