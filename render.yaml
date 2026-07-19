@@ -41,5 +41,7 @@ services:
         value: "--max-old-space-size=460"
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
+      - key: NPM_CONFIG_LEGACY_PEER_DEPS
+        value: "true"
       - key: REACT_APP_BACKEND_URL
         sync: false
