@@ -1,0 +1,32 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/causesense
+            git pull origin main
+            export GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}"
+            export SECRET_KEY="${{ secrets.SECRET_KEY }}"
+            export CORS_ORIGINS="https://causesenseai.com,https://www.causesenseai.com"
+            export REACT_APP_BACKEND_URL=""
+            docker compose pull || true
+            docker compose build --no-cache
+            docker compose up -d
+            docker compose ps

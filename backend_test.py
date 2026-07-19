@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 
 class RCAAPITester:
-    def __init__(self, base_url="https://root-cause-ai-3.preview.emergentagent.com"):
+    def __init__(self, base_url="http://localhost"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None
@@ -333,7 +333,8 @@ class RCAAPITester:
         return False
 
 def main():
-    tester = RCAAPITester()
+    base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost"
+    tester = RCAAPITester(base_url=base_url)
     
     print("🚀 Starting RCA Platform API Tests")
     print(f"Base URL: {tester.base_url}")

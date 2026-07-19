@@ -356,34 +356,32 @@ Anomalies Detected: {len(analysis.get('anomalies', []))}"""
             sources=None
         )
 
-# Report download endpoint disabled for deployment
-# @api_router.get("/reports/{analysis_id}/download")
-# async def download_report(analysis_id: str, user_id: str = Depends(get_current_user)):
-#     from pdf_generator import PDFReportGenerator
-#     
-#     analysis = await db.analyses.find_one(
-#         {"id": analysis_id, "user_id": user_id},
-#         {"_id": 0}
-#     )
-#     
-#     if not analysis:
-#         raise HTTPException(status_code=404, detail="Analysis not found")
-#     
-#     # Generate PDF
-#     pdf_path = f"/app/backend/uploads/RCA_Report_{analysis_id}.pdf"
-#     
-#     try:
-#         pdf_gen = PDFReportGenerator(analysis, pdf_path)
-#         pdf_gen.generate()
-#         
-#         return FileResponse(
-#             path=pdf_path,
-#             filename=f"CauseSense_RCA_Report_{analysis_id}.pdf",
-#             media_type="application/pdf"
-#         )
-#     except Exception as e:
-#         logger.error(f"Error generating PDF: {e}")
-#         raise HTTPException(status_code=500, detail="Failed to generate report")
+@api_router.get("/reports/{analysis_id}/download")
+async def download_report(analysis_id: str, user_id: str = Depends(get_current_user)):
+    from pdf_generator import PDFReportGenerator
+
+    analysis = await db.analyses.find_one(
+        {"id": analysis_id, "user_id": user_id},
+        {"_id": 0}
+    )
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    pdf_path = str(UPLOAD_DIR / f"RCA_Report_{analysis_id}.pdf")
+
+    try:
+        pdf_gen = PDFReportGenerator(analysis, pdf_path)
+        pdf_gen.generate()
+
+        return FileResponse(
+            path=pdf_path,
+            filename=f"CauseSense_RCA_Report_{analysis_id}.pdf",
+            media_type="application/pdf"
+        )
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate report")
 
 app.include_router(api_router)
 
