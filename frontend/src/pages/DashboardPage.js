@@ -670,7 +670,8 @@ export default function DashboardPage() {
                       <div className="h-[400px] overflow-y-auto border border-border rounded-md p-4 space-y-3 bg-secondary">
                         {chatHistory.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-8">
-                            Ask questions about your analysis results
+                            Ask about your uploaded data, anomalies, ML results, or root cause.
+                            Off-topic questions (politics, news, etc.) will be declined.
                           </p>
                         ) : (
                           chatHistory.map((msg, idx) => (
@@ -696,10 +697,9 @@ export default function DashboardPage() {
                           value={chatMessage}
                           onChange={(e) => setChatMessage(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleChat()}
-                          placeholder="Ask about the analysis..."
+                          placeholder="Ask about analysis results or your dataset..."
                           data-testid="chat-input"
-                        />
-                        <Button onClick={handleChat} data-testid="chat-send-button">
+                        />                        <Button onClick={handleChat} data-testid="chat-send-button">
                           <MessageSquare className="w-4 h-4" />
                         </Button>
                       </div>

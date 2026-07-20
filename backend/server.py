@@ -335,45 +335,72 @@ async def delete_analysis(analysis_id: str, user_id: str = Depends(get_current_u
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage, user_id: str = Depends(get_current_user)):
     try:
-        analysis_context = ""
+        from chat_guardrails import check_message_allowed, build_chat_prompt, DECLINE_MESSAGE
+
+        allowed, decline = check_message_allowed(message.message)
+        if not allowed:
+            response = decline or DECLINE_MESSAGE
+            await db.chat_messages.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "analysis_id": message.analysis_id,
+                "message": message.message,
+                "response": response,
+                "blocked": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            return ChatResponse(response=response, sources=None)
+
+        analysis_context = "No analysis selected — answer generally about RCA workflow only if relevant."
         root_cause_info = "No analysis selected"
-        
+
         if message.analysis_id:
             analysis = await db.analyses.find_one(
                 {"id": message.analysis_id, "user_id": user_id},
                 {"_id": 0}
             )
-            if analysis and analysis.get('root_cause'):
-                root_cause = analysis.get('root_cause', {})
+            if analysis:
+                root_cause = analysis.get('root_cause') or {}
                 root_cause_info = f"""Root Cause: {root_cause.get('root_cause', 'Not determined')}
 Confidence: {root_cause.get('confidence_score', 0) * 100:.0f}%
-Anomalies Detected: {len(analysis.get('anomalies', []))}"""
-        
+Anomalies Detected: {len(analysis.get('anomalies', []))}
+Hypotheses: {len(analysis.get('hypotheses', []))}
+ML models: {len(analysis.get('ml_results', []))}
+Status: {analysis.get('status', 'unknown')}"""
+                analysis_context = root_cause_info
+
         try:
             agent = BaseAgent()
-            chat_session = await agent.create_chat(
-                "You are a technical assistant. Provide concise answers about machine failure analysis.",
-                f"chat_{user_id}_{message.analysis_id or 'general'}"
+            prompt = build_chat_prompt(message.message, analysis_context)
+            # Pass system rules as system message; user content is the scoped prompt
+            response = await agent.send_message(
+                "You are CauseSense AI. Follow the safety and scope rules in the user message strictly.",
+                prompt,
             )
-            
-            query = f"Context: {root_cause_info}\n\nQuestion: {message.message}\n\nProvide a brief answer (2-3 sentences)."
-            response = await agent.send_message(chat_session, query)
-            
+            if not response or not str(response).strip():
+                response = DECLINE_MESSAGE
+
         except Exception as llm_error:
             logger.error(f"LLM error in chat: {llm_error}")
-            response = f"Based on the analysis: {root_cause_info}\n\nRegarding your question about '{message.message}', please refer to the analysis results in the Overview tab for detailed information."
-        
+            response = (
+                f"Based on the analysis: {root_cause_info}\n\n"
+                "I could not reach the AI service just now. "
+                "Please check the Overview tab for your analysis results, "
+                "or ask again about anomalies, ML findings, or root cause."
+            )
+
         await db.chat_messages.insert_one({
             "id": str(uuid.uuid4()),
             "user_id": user_id,
             "analysis_id": message.analysis_id,
             "message": message.message,
             "response": response,
+            "blocked": False,
             "created_at": datetime.now(timezone.utc).isoformat()
         })
-        
+
         return ChatResponse(response=response, sources=None)
-        
+
     except Exception as e:
         logger.error(f"Error in chat: {e}")
         return ChatResponse(
