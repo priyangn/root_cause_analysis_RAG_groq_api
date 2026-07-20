@@ -12,6 +12,21 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    # Present when SMTP is not configured so the app still works on free hosting
+    reset_url: Optional[str] = None
+
+class MessageResponse(BaseModel):
+    message: str
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
