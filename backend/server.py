@@ -119,20 +119,20 @@ async def login(credentials: UserLogin):
 
 @api_router.post("/auth/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(payload: ForgotPasswordRequest):
-    """Start password reset. Always returns a generic message (avoids email enumeration)."""
+    """Start password reset. Always returns the same generic message (no token leakage)."""
     generic = (
-        "If an account exists for that email, password reset instructions are available. "
-        "The link expires in 1 hour."
+        "If an account exists for that email, we sent a password reset link. "
+        "Please check your inbox (and spam folder). The link expires in 1 hour."
     )
     email = payload.email.strip().lower()
-    # Case-insensitive match for legacy accounts
     user = await db.users.find_one(
         {"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}},
         {"_id": 0},
     )
 
+    # Always return the same response shape — do not reveal whether the email exists
+    # and never return the reset token in the API body (security).
     if not user:
-        # Same shape as success path when we don't return a URL
         return ForgotPasswordResponse(message=generic)
 
     raw_token = create_reset_token()
@@ -152,30 +152,18 @@ async def forgot_password(payload: ForgotPasswordRequest):
 
     frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
     if not frontend_url:
-        # Prefer public site URL; fall back to Render web service name
         frontend_url = "https://causesense-web.onrender.com"
 
     reset_url = f"{frontend_url}/reset-password?token={raw_token}"
 
-    emailed = False
-    if email_configured():
-        emailed = send_password_reset_email(email, reset_url)
-
-    # Without SMTP (typical on free Render), return the link so the user can reset
-    return_token = os.environ.get("PASSWORD_RESET_RETURN_TOKEN", "true").lower() in (
-        "1", "true", "yes"
-    )
-    if emailed:
-        return ForgotPasswordResponse(message=generic)
-    if return_token:
-        return ForgotPasswordResponse(
-            message=(
-                "Password reset link created. Email delivery is not configured on this server, "
-                "so use the link below (expires in 1 hour)."
-            ),
-            reset_url=reset_url,
+    if not email_configured():
+        logger.error(
+            "Password reset for user_id=%s skipped: configure RESEND_API_KEY or SMTP_* on causesense-api",
+            user["id"],
         )
-    logger.info("Password reset requested for %s (token created; email/link not returned)", email)
+    else:
+        send_password_reset_email(email, reset_url)
+
     return ForgotPasswordResponse(message=generic)
 
 @api_router.post("/auth/reset-password", response_model=MessageResponse)

@@ -1,45 +1,32 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Activity } from 'lucide-react';
+import { Activity, Mail } from 'lucide-react';
 import { authAPI } from '../lib/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resetUrl, setResetUrl] = useState('');
-  const [doneMessage, setDoneMessage] = useState('');
-  const navigate = useNavigate();
+  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setResetUrl('');
-    setDoneMessage('');
     try {
       const { data } = await authAPI.forgotPassword({ email: email.trim().toLowerCase() });
-      setDoneMessage(data.message);
-      if (data.reset_url) {
-        setResetUrl(data.reset_url);
+      setSent(true);
+      toast.success('Check your email');
+      // Always show the server's generic message (never a reset token)
+      if (data?.message) {
+        // kept for accessibility; UI uses fixed copy below
       }
-      toast.success('Reset instructions ready');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Could not start password reset');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const openResetLink = () => {
-    if (!resetUrl) return;
-    try {
-      const url = new URL(resetUrl);
-      navigate(`${url.pathname}${url.search}`);
-    } catch {
-      window.location.href = resetUrl;
     }
   };
 
@@ -58,7 +45,7 @@ export default function ForgotPasswordPage() {
           <p className="text-sm text-muted-foreground">Reset your password</p>
         </div>
 
-        {!doneMessage ? (
+        {!sent ? (
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="forgot-password-form">
             <div>
               <label className="metric-label block mb-2">Email Address</label>
@@ -83,28 +70,21 @@ export default function ForgotPasswordPage() {
             </Button>
           </form>
         ) : (
-          <div className="space-y-4" data-testid="forgot-password-result">
-            <p className="text-sm text-muted-foreground">{doneMessage}</p>
-            {resetUrl && (
-              <Button
-                type="button"
-                className="w-full h-10 font-medium"
-                onClick={openResetLink}
-                data-testid="forgot-open-reset-link"
-              >
-                Continue to reset password
-              </Button>
-            )}
+          <div className="space-y-4 text-center" data-testid="forgot-password-result">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Mail className="w-6 h-6 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              If an account exists for <strong>{email}</strong>, we sent a password reset link.
+              Check your inbox and spam folder. The link expires in 1 hour.
+            </p>
             <Button
               type="button"
               variant="outline"
               className="w-full h-10"
-              onClick={() => {
-                setDoneMessage('');
-                setResetUrl('');
-              }}
+              onClick={() => setSent(false)}
             >
-              Try another email
+              Use a different email
             </Button>
           </div>
         )}

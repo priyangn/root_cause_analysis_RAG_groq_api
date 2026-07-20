@@ -21,8 +21,6 @@ class ResetPasswordRequest(BaseModel):
 
 class ForgotPasswordResponse(BaseModel):
     message: str
-    # Present when SMTP is not configured so the app still works on free hosting
-    reset_url: Optional[str] = None
 
 class MessageResponse(BaseModel):
     message: str
