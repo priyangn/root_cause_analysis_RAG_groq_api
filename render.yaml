@@ -24,6 +24,8 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://causesense-web.onrender.com
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
 
   - type: web
     name: causesense-web

@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import time
 from typing import List, Optional
 from dotenv import load_dotenv
 from groq import Groq
@@ -8,6 +9,14 @@ from groq import Groq
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# Prefer current Groq production models; fall back if one is unavailable / rate-limited.
+DEFAULT_GROQ_MODELS = [
+    os.environ.get("GROQ_MODEL", "").strip() or "openai/gpt-oss-20b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "openai/gpt-oss-120b",
+]
 
 
 def _get_emergent_classes():
@@ -17,6 +26,16 @@ def _get_emergent_classes():
         return LlmChat, UserMessage
     except ImportError:
         return None, None
+
+
+def _unique_models() -> List[str]:
+    seen = set()
+    out = []
+    for m in DEFAULT_GROQ_MODELS:
+        if m and m not in seen:
+            seen.add(m)
+            out.append(m)
+    return out
 
 
 class BaseAgent:
@@ -45,14 +64,45 @@ class BaseAgent:
             return chat
         return None
 
-    def _groq_complete(self, messages: list) -> str:
-        chat_completion = self.groq_client.chat.completions.create(
-            messages=messages,
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=2000,
-        )
-        return chat_completion.choices[0].message.content or ""
+    def _groq_complete(self, messages: list, model: str) -> str:
+        kwargs = {
+            "messages": messages,
+            "model": model,
+            "temperature": 0.7,
+        }
+        # Newer Groq models prefer max_completion_tokens; keep max_tokens as fallback.
+        try:
+            chat_completion = self.groq_client.chat.completions.create(
+                **kwargs,
+                max_completion_tokens=1500,
+            )
+        except TypeError:
+            chat_completion = self.groq_client.chat.completions.create(
+                **kwargs,
+                max_tokens=1500,
+            )
+        return (chat_completion.choices[0].message.content or "").strip()
+
+    def _call_groq_with_fallback(self, messages: list) -> str:
+        last_error = None
+        for model in _unique_models():
+            for attempt in range(2):
+                try:
+                    text = self._groq_complete(messages, model)
+                    if text:
+                        logger.info("Response from Groq model=%s", model)
+                        return text
+                    last_error = RuntimeError(f"Empty response from {model}")
+                except Exception as e:
+                    last_error = e
+                    err = str(e).lower()
+                    logger.warning("Groq model=%s attempt=%s failed: %s", model, attempt + 1, e)
+                    # Brief pause on rate limits before retry / next model
+                    if "rate" in err or "429" in err or "tpm" in err:
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
+                    break  # try next model for non-rate errors
+        raise RuntimeError(str(last_error) if last_error else "Groq request failed")
 
     async def send_message(
         self,
@@ -67,17 +117,32 @@ class BaseAgent:
                     chat_or_system if isinstance(chat_or_system, str)
                     else "You are a helpful AI assistant."
                 )
-                messages = [{"role": "system", "content": system_message}]
-                for turn in (history or []):
-                    role = turn.get("role")
-                    content = turn.get("content")
-                    if role in ("user", "assistant") and content:
-                        messages.append({"role": role, "content": content})
-                messages.append({"role": "user", "content": message})
 
-                # Sync Groq SDK blocks the event loop — run in a thread
-                response = await asyncio.to_thread(self._groq_complete, messages)
-                logger.info("Response from Groq")
+                # Keep API payload simple: system + one user message.
+                # Embed prior turns in text to avoid role-alternation API errors.
+                user_content = message
+                if history:
+                    lines = []
+                    for turn in history[-6:]:
+                        role = (turn.get("role") or "").strip().lower()
+                        content = (turn.get("content") or "").strip()
+                        if role in ("user", "assistant") and content:
+                            label = "User" if role == "user" else "Assistant"
+                            lines.append(f"{label}: {content[:1500]}")
+                    if lines:
+                        user_content = (
+                            "Previous conversation:\n"
+                            + "\n".join(lines)
+                            + "\n\nCurrent question:\n"
+                            + message
+                        )
+
+                messages = [
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_content},
+                ]
+
+                response = await asyncio.to_thread(self._call_groq_with_fallback, messages)
                 return response
 
             # Optional Emergent fallback (legacy)
@@ -104,4 +169,24 @@ class BaseAgent:
 
         except Exception as e:
             logger.error(f"Error in send_message: {e}")
-            return "Error processing request"
+            err = str(e)
+            if "401" in err or "invalid" in err.lower() and "api" in err.lower():
+                return (
+                    "Chat AI is not authorized (check GROQ_API_KEY on causesense-api). "
+                    "Update the key in Render Environment and redeploy."
+                )
+            if "429" in err or "rate" in err.lower():
+                return (
+                    "The AI service is rate-limited right now. "
+                    "Please wait about a minute and ask again."
+                )
+            if "model" in err.lower():
+                return (
+                    "The configured Groq model is unavailable. "
+                    "Set GROQ_MODEL=openai/gpt-oss-20b on causesense-api and redeploy."
+                )
+            return (
+                "I could not reach the AI service just now. "
+                "Please try again in a moment. If this keeps happening, "
+                "check GROQ_API_KEY and usage limits in the Groq console."
+            )
