@@ -1,10 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
-import GoogleSignInButton from '../components/GoogleSignInButton';
 import { toast } from 'sonner';
 import { Activity } from 'lucide-react';
 
@@ -12,7 +11,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -28,19 +27,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
-  const handleGoogle = useCallback(async (credential) => {
-    setLoading(true);
-    try {
-      await loginWithGoogle(credential);
-      toast.success('Signed in with Google');
-      navigate('/dashboard');
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Google sign-in failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [loginWithGoogle, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-secondary/10">
@@ -98,10 +84,6 @@ export default function LoginPage() {
             ) : 'Sign In'}
           </Button>
         </form>
-
-        <div className="mt-5">
-          <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
-        </div>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">

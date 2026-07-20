@@ -1,5 +1,7 @@
 import os
 import logging
+import asyncio
+from typing import List, Optional
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -43,26 +45,38 @@ class BaseAgent:
             return chat
         return None
 
-    async def send_message(self, chat_or_system: any, message: str) -> str:
-        """Send message with Groq (primary)."""
+    def _groq_complete(self, messages: list) -> str:
+        chat_completion = self.groq_client.chat.completions.create(
+            messages=messages,
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=2000,
+        )
+        return chat_completion.choices[0].message.content or ""
+
+    async def send_message(
+        self,
+        chat_or_system,
+        message: str,
+        history: Optional[List[dict]] = None,
+    ) -> str:
+        """Send message with Groq (primary). history: optional prior [{role, content}]."""
         try:
             if self.use_groq and self.groq_client:
                 system_message = (
                     chat_or_system if isinstance(chat_or_system, str)
                     else "You are a helpful AI assistant."
                 )
+                messages = [{"role": "system", "content": system_message}]
+                for turn in (history or []):
+                    role = turn.get("role")
+                    content = turn.get("content")
+                    if role in ("user", "assistant") and content:
+                        messages.append({"role": role, "content": content})
+                messages.append({"role": "user", "content": message})
 
-                chat_completion = self.groq_client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": message}
-                    ],
-                    model="llama-3.3-70b-versatile",
-                    temperature=0.7,
-                    max_tokens=2000,
-                )
-
-                response = chat_completion.choices[0].message.content
+                # Sync Groq SDK blocks the event loop — run in a thread
+                response = await asyncio.to_thread(self._groq_complete, messages)
                 logger.info("Response from Groq")
                 return response
 

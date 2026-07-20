@@ -19,9 +19,12 @@ export default function DashboardPage() {
   const [analyses, setAnalyses] = useState([]);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
   const [hiddenLines, setHiddenLines] = useState({});
   const fileInputRef = useRef(null);
   const pollInterval = useRef(null);
+  const chatBusyRef = useRef(false);
+  const chatEndRef = useRef(null);
 
   const handleLegendClick = (dataKey) => {
     setHiddenLines(prev => ({
@@ -163,20 +166,45 @@ export default function DashboardPage() {
   };
 
   const handleChat = async () => {
-    if (!chatMessage.trim()) return;
+    const userMessage = chatMessage.trim();
+    if (!userMessage || chatBusyRef.current) return;
 
-    const userMessage = chatMessage;
+    chatBusyRef.current = true;
+    setChatLoading(true);
     setChatMessage('');
+
+    const priorHistory = chatHistory.slice(-8);
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
-      const response = await chatAPI.sendMessage(userMessage, currentAnalysis?.id);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: response.data.response }]);
+      const response = await chatAPI.sendMessage(
+        userMessage,
+        currentAnalysis?.id,
+        priorHistory
+      );
+      const reply =
+        response?.data?.response ||
+        'No reply received. Please try again.';
+      setChatHistory(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (error) {
-      toast.error('Chat failed');
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error.' }]);
+      const detail =
+        error.response?.data?.detail ||
+        error.message ||
+        'Chat failed';
+      toast.error(typeof detail === 'string' ? detail : 'Chat failed');
+      setChatHistory(prev => [
+        ...prev,
+        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
+      ]);
+    } finally {
+      chatBusyRef.current = false;
+      setChatLoading(false);
     }
   };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory, chatLoading]);
 
   const formatTimeRemaining = (seconds) => {
     if (!seconds || seconds <= 0) return '';
@@ -668,7 +696,7 @@ export default function DashboardPage() {
                   <TabsContent value="chat" data-testid="chat-content">
                     <div className="space-y-4">
                       <div className="h-[400px] overflow-y-auto border border-border rounded-md p-4 space-y-3 bg-secondary">
-                        {chatHistory.length === 0 ? (
+                        {chatHistory.length === 0 && !chatLoading ? (
                           <p className="text-sm text-muted-foreground text-center py-8">
                             Ask about your uploaded data, anomalies, ML results, or root cause.
                             Off-topic questions (politics, news, etc.) will be declined.
@@ -690,16 +718,34 @@ export default function DashboardPage() {
                             </div>
                           ))
                         )}
+                        {chatLoading && (
+                          <div className="p-3 rounded-md bg-card mr-12 border border-border">
+                            <div className="metric-label mb-1">AI Assistant</div>
+                            <p className="text-sm text-muted-foreground">Thinking...</p>
+                          </div>
+                        )}
+                        <div ref={chatEndRef} />
                       </div>
 
                       <div className="flex gap-2">
                         <Input
                           value={chatMessage}
                           onChange={(e) => setChatMessage(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleChat()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleChat();
+                            }
+                          }}
                           placeholder="Ask about analysis results or your dataset..."
                           data-testid="chat-input"
-                        />                        <Button onClick={handleChat} data-testid="chat-send-button">
+                          disabled={chatLoading}
+                        />
+                        <Button
+                          onClick={handleChat}
+                          data-testid="chat-send-button"
+                          disabled={chatLoading || !chatMessage.trim()}
+                        >
                           <MessageSquare className="w-4 h-4" />
                         </Button>
                       </div>

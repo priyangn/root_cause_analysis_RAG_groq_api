@@ -12,9 +12,6 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class GoogleAuthRequest(BaseModel):
-    credential: str  # Google ID token from GIS
-
 class MessageResponse(BaseModel):
     message: str
 
@@ -114,6 +111,7 @@ class AnalysisResponse(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     analysis_id: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = None
 
 class ChatResponse(BaseModel):
     response: str

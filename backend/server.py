@@ -12,9 +12,6 @@ from typing import List
 import asyncio
 import uuid
 
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_requests
-
 from models import *
 from auth import (
     get_password_hash,
@@ -118,74 +115,6 @@ async def login(credentials: UserLogin):
     )
     
     return TokenResponse(access_token=token, user=user_response)
-
-@api_router.post("/auth/google", response_model=TokenResponse)
-async def google_auth(payload: GoogleAuthRequest):
-    """Sign in / register with a Google ID token (Google Identity Services)."""
-    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
-    if not client_id:
-        raise HTTPException(
-            status_code=503,
-            detail="Google sign-in is not configured on this server",
-        )
-
-    credential = (payload.credential or "").strip()
-    if not credential:
-        raise HTTPException(status_code=400, detail="Missing Google credential")
-
-    try:
-        idinfo = google_id_token.verify_oauth2_token(
-            credential,
-            google_requests.Request(),
-            client_id,
-        )
-    except Exception as e:
-        logger.warning("Google token verification failed: %s", e)
-        raise HTTPException(status_code=401, detail="Invalid Google credential")
-
-    if idinfo.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
-        raise HTTPException(status_code=401, detail="Invalid Google credential")
-    if not idinfo.get("email_verified"):
-        raise HTTPException(status_code=401, detail="Google email is not verified")
-
-    email = (idinfo.get("email") or "").strip().lower()
-    google_sub = idinfo.get("sub")
-    full_name = (idinfo.get("name") or email.split("@")[0] or "User").strip()
-    if not email or not google_sub:
-        raise HTTPException(status_code=401, detail="Invalid Google credential")
-
-    user = await db.users.find_one({"google_id": google_sub}, {"_id": 0})
-    if not user:
-        user = await db.users.find_one({"email": email}, {"_id": 0})
-        if user:
-            await db.users.update_one(
-                {"id": user["id"]},
-                {"$set": {"google_id": google_sub, "auth_provider": "google"}},
-            )
-            user["google_id"] = google_sub
-            user["auth_provider"] = "google"
-        else:
-            user = {
-                "id": str(uuid.uuid4()),
-                "email": email,
-                "password_hash": None,
-                "full_name": full_name,
-                "google_id": google_sub,
-                "auth_provider": "google",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.users.insert_one(user)
-
-    token = create_access_token({"sub": user["id"]})
-    return TokenResponse(
-        access_token=token,
-        user=UserResponse(
-            id=user["id"],
-            email=user["email"],
-            full_name=user["full_name"],
-            created_at=user["created_at"],
-        ),
-    )
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(user_id: str = Depends(get_current_user)):
@@ -451,16 +380,27 @@ ML models: {len(analysis.get('ml_results', []))}
 Status: {analysis.get('status', 'unknown')}"""
                 analysis_context = root_cause_info
 
+        history = []
+        for item in (message.history or [])[-8:]:
+            role = (item.get("role") or "").strip().lower()
+            content = (item.get("content") or "").strip()
+            if role in ("user", "assistant") and content:
+                history.append({"role": role, "content": content[:2000]})
+
         try:
             agent = BaseAgent()
             prompt = build_chat_prompt(message.message, analysis_context)
-            # Pass system rules as system message; user content is the scoped prompt
             response = await agent.send_message(
-                "You are CauseSense AI. Follow the safety and scope rules in the user message strictly.",
+                "You are CauseSense AI. Follow the safety and scope rules in the user message. "
+                "Use prior conversation turns when the user asks follow-ups.",
                 prompt,
+                history=history,
             )
             if not response or not str(response).strip():
-                response = DECLINE_MESSAGE
+                response = (
+                    "I could not generate a reply just now. "
+                    "Please ask again about your analysis, anomalies, or root cause."
+                )
 
         except Exception as llm_error:
             logger.error(f"LLM error in chat: {llm_error}")
