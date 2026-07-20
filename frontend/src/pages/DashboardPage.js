@@ -214,7 +214,8 @@ export default function DashboardPage() {
 
                 <div className="p-3 rounded-md bg-primary/10 border border-primary/20">
                   <p className="text-xs text-muted-foreground">
-                    <strong>Note:</strong> Maximum file size: 200MB per file
+                    <strong>Note:</strong> Max upload 80MB on free hosting. Large CSVs are auto-sampled
+                    (up to ~80k rows loaded, ~12k for ML) so analysis can finish on Render.
                   </p>
                 </div>
 

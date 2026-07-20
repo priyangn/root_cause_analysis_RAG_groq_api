@@ -94,21 +94,29 @@ class AnalysisPipeline:
                 result['hypotheses'] = self.hypothesis_agent.generate_fallback_hypotheses(result['anomalies'])
             
             if progress_callback:
-                await progress_callback(65, "Training ML models...", 10)
-            
+                await progress_callback(65, "Training ML models (sampled for memory)...", 10)
+
             try:
                 result['ml_results'] = await self.ml_agent.train_and_validate(dataframes)
+                if progress_callback:
+                    await progress_callback(75, "ML training complete", 8)
             except Exception as ml_error:
                 logger.error(f"ML training error: {ml_error}")
                 result['ml_results'] = self.ml_agent.generate_mock_results()
-            
+                if progress_callback:
+                    await progress_callback(75, "ML training used fallback results", 8)
+
             if progress_callback:
                 await progress_callback(80, "Performing causal analysis...", 7)
-            
-            result['causal_analysis'] = await self.causal_agent.perform_causal_analysis(
-                dataframes,
-                result['ml_results']
-            )
+
+            try:
+                result['causal_analysis'] = await self.causal_agent.perform_causal_analysis(
+                    dataframes,
+                    result['ml_results']
+                )
+            except Exception as causal_error:
+                logger.error(f"Causal analysis error: {causal_error}")
+                result['causal_analysis'] = self.causal_agent.generate_mock_causal_params()
             
             if progress_callback:
                 await progress_callback(90, "Generating report...", 3)

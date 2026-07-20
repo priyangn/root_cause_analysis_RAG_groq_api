@@ -48,6 +48,10 @@ Provide a technical analysis of these findings and identify potential failure in
         for df in dataframes:
             if df.empty:
                 continue
+
+            # Cap rows for z-score scan on free-tier memory
+            if len(df) > 20000:
+                df = df.sample(n=20000, random_state=42)
             
             # Find timestamp column
             timestamp_col = None

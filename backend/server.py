@@ -124,27 +124,40 @@ async def upload_file(
     user_id: str = Depends(get_current_user)
 ):
     try:
-        # Check file size (200MB limit)
-        MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB in bytes
-        
-        # Read file content to check size
-        file_content = await file.read()
-        file_size = len(file_content)
-        
-        if file_size > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File too large. Maximum size is 200MB, your file is {file_size / (1024*1024):.1f}MB"
-            )
-        
+        from data_limits import MAX_UPLOAD_BYTES
+
+        # Stream to disk — avoid holding entire file in RAM (critical on Render free)
         file_id = str(uuid.uuid4())
-        file_extension = Path(file.filename).suffix
+        file_extension = Path(file.filename).suffix.lower()
         file_path = UPLOAD_DIR / f"{file_id}{file_extension}"
-        
-        # Write file content
+
+        file_size = 0
+        chunk_size = 1024 * 1024  # 1 MB
         with open(file_path, "wb") as buffer:
-            buffer.write(file_content)
-        
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                file_size += len(chunk)
+                if file_size > MAX_UPLOAD_BYTES:
+                    buffer.close()
+                    if file_path.exists():
+                        file_path.unlink()
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"File too large for free hosting memory limits. "
+                            f"Maximum is {MAX_UPLOAD_BYTES // (1024*1024)}MB "
+                            f"(your upload exceeded this). Split the CSV or sample rows."
+                        ),
+                    )
+                buffer.write(chunk)
+
+        if file_size == 0:
+            if file_path.exists():
+                file_path.unlink()
+            raise HTTPException(status_code=400, detail="Empty file")
+
         file_metadata = {
             "id": file_id,
             "user_id": user_id,
@@ -154,9 +167,9 @@ async def upload_file(
             "file_path": str(file_path),
             "uploaded_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         await db.uploaded_files.insert_one(file_metadata)
-        
+
         return FileUploadResponse(
             id=file_id,
             filename=file.filename,
@@ -164,7 +177,7 @@ async def upload_file(
             file_size=file_size,
             message="File uploaded successfully"
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
