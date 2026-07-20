@@ -12,15 +12,8 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class ForgotPasswordRequest(BaseModel):
-    email: str
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str = Field(..., min_length=6)
-
-class ForgotPasswordResponse(BaseModel):
-    message: str
+class GoogleAuthRequest(BaseModel):
+    credential: str  # Google ID token from GIS
 
 class MessageResponse(BaseModel):
     message: str

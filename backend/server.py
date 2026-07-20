@@ -11,7 +11,9 @@ import shutil
 from typing import List
 import asyncio
 import uuid
-import re
+
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from models import *
 from auth import (
@@ -19,14 +21,10 @@ from auth import (
     verify_password,
     create_access_token,
     get_current_user,
-    create_reset_token,
-    hash_reset_token,
-    reset_token_expiry,
 )
 from orchestrator import AnalysisPipeline
 from vector_store import VectorStore
 from agents.base_agent import BaseAgent
-from email_service import email_configured, send_password_reset_email
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -100,7 +98,11 @@ async def register(user_data: UserCreate):
 async def login(credentials: UserLogin):
     email = credentials.email.strip().lower()
     user = await db.users.find_one({"email": email}, {"_id": 0})
-    if not user or not verify_password(credentials.password, user["password_hash"]):
+    if (
+        not user
+        or not user.get("password_hash")
+        or not verify_password(credentials.password, user["password_hash"])
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
@@ -117,102 +119,73 @@ async def login(credentials: UserLogin):
     
     return TokenResponse(access_token=token, user=user_response)
 
-@api_router.post("/auth/forgot-password", response_model=ForgotPasswordResponse)
-async def forgot_password(payload: ForgotPasswordRequest):
-    """Start password reset. Always returns the same generic message (no token leakage)."""
-    generic = (
-        "If an account exists for that email, we sent a password reset link. "
-        "Please check your inbox (and spam folder). The link expires in 1 hour."
-    )
-    email = payload.email.strip().lower()
-    user = await db.users.find_one(
-        {"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}},
-        {"_id": 0},
-    )
-
-    # Always return the same response shape — do not reveal whether the email exists
-    # and never return the reset token in the API body (security).
-    if not user:
-        return ForgotPasswordResponse(message=generic)
-
-    raw_token = create_reset_token()
-    token_hash = hash_reset_token(raw_token)
-    expires_at = reset_token_expiry()
-
-    await db.password_resets.delete_many({"user_id": user["id"]})
-    await db.password_resets.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "email": email,
-        "token_hash": token_hash,
-        "expires_at": expires_at.isoformat(),
-        "used": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
-    frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
-    if not frontend_url:
-        frontend_url = "https://causesense-web.onrender.com"
-
-    reset_url = f"{frontend_url}/reset-password?token={raw_token}"
-
-    if not email_configured():
-        logger.error(
-            "Password reset for user_id=%s skipped: configure RESEND_API_KEY or SMTP_* on causesense-api",
-            user["id"],
-        )
-    else:
-        send_password_reset_email(email, reset_url)
-
-    return ForgotPasswordResponse(message=generic)
-
-@api_router.post("/auth/reset-password", response_model=MessageResponse)
-async def reset_password(payload: ResetPasswordRequest):
-    """Complete password reset with a one-time token."""
-    token = (payload.token or "").strip()
-    if not token or len(payload.new_password) < 6:
+@api_router.post("/auth/google", response_model=TokenResponse)
+async def google_auth(payload: GoogleAuthRequest):
+    """Sign in / register with a Google ID token (Google Identity Services)."""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    if not client_id:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid token or password (minimum 6 characters)",
+            status_code=503,
+            detail="Google sign-in is not configured on this server",
         )
 
-    token_hash = hash_reset_token(token)
-    reset_doc = await db.password_resets.find_one(
-        {"token_hash": token_hash, "used": False},
-        {"_id": 0},
-    )
-    if not reset_doc:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    credential = (payload.credential or "").strip()
+    if not credential:
+        raise HTTPException(status_code=400, detail="Missing Google credential")
 
     try:
-        expires_at = datetime.fromisoformat(reset_doc["expires_at"])
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
-
-    if datetime.now(timezone.utc) > expires_at:
-        await db.password_resets.update_one(
-            {"token_hash": token_hash},
-            {"$set": {"used": True}},
+        idinfo = google_id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            client_id,
         )
-        raise HTTPException(status_code=400, detail="Reset link has expired. Request a new one.")
+    except Exception as e:
+        logger.warning("Google token verification failed: %s", e)
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
 
-    await db.users.update_one(
-        {"id": reset_doc["user_id"]},
-        {"$set": {"password_hash": get_password_hash(payload.new_password)}},
-    )
-    await db.password_resets.update_one(
-        {"token_hash": token_hash},
-        {"$set": {"used": True, "used_at": datetime.now(timezone.utc).isoformat()}},
-    )
-    # Invalidate any other outstanding tokens for this user
-    await db.password_resets.update_many(
-        {"user_id": reset_doc["user_id"], "used": False},
-        {"$set": {"used": True}},
-    )
+    if idinfo.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+    if not idinfo.get("email_verified"):
+        raise HTTPException(status_code=401, detail="Google email is not verified")
 
-    return MessageResponse(message="Password updated successfully. You can sign in with your new password.")
+    email = (idinfo.get("email") or "").strip().lower()
+    google_sub = idinfo.get("sub")
+    full_name = (idinfo.get("name") or email.split("@")[0] or "User").strip()
+    if not email or not google_sub:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+
+    user = await db.users.find_one({"google_id": google_sub}, {"_id": 0})
+    if not user:
+        user = await db.users.find_one({"email": email}, {"_id": 0})
+        if user:
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"google_id": google_sub, "auth_provider": "google"}},
+            )
+            user["google_id"] = google_sub
+            user["auth_provider"] = "google"
+        else:
+            user = {
+                "id": str(uuid.uuid4()),
+                "email": email,
+                "password_hash": None,
+                "full_name": full_name,
+                "google_id": google_sub,
+                "auth_provider": "google",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.users.insert_one(user)
+
+    token = create_access_token({"sub": user["id"]})
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(
+            id=user["id"],
+            email=user["email"],
+            full_name=user["full_name"],
+            created_at=user["created_at"],
+        ),
+    )
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(user_id: str = Depends(get_current_user)):

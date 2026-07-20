@@ -24,9 +24,7 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://causesense-web.onrender.com
-      - key: RESEND_API_KEY
-        sync: false
-      - key: EMAIL_FROM
+      - key: GOOGLE_CLIENT_ID
         sync: false
 
   - type: web
@@ -50,4 +48,6 @@ services:
       - key: NPM_CONFIG_LEGACY_PEER_DEPS
         value: "true"
       - key: REACT_APP_BACKEND_URL
+        sync: false
+      - key: REACT_APP_GOOGLE_CLIENT_ID
         sync: false

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import { toast } from 'sonner';
 import { Activity } from 'lucide-react';
 
@@ -14,7 +15,7 @@ export default function RegisterPage() {
     full_name: ''
   });
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -30,6 +31,19 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  const handleGoogle = useCallback(async (credential) => {
+    setLoading(true);
+    try {
+      await loginWithGoogle(credential);
+      toast.success('Signed in with Google');
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [loginWithGoogle, navigate]);
 
   return (
     <div 
@@ -100,6 +114,10 @@ export default function RegisterPage() {
             {loading ? 'Creating Account...' : 'Register'}
           </Button>
         </form>
+
+        <div className="mt-5">
+          <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
+        </div>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
