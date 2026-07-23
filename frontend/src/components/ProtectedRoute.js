@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext';
 
 export const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-  if (loading) {
+  // Wait while auth is resolving, or right after login while user state catches up
+  if (loading || (token && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-foreground text-lg font-mono">Loading...</div>

@@ -10,6 +10,13 @@ import { Upload, FileText, Activity, TrendingUp, Brain, GitBranch, MessageSquare
 import { uploadAPI, analysisAPI, chatAPI } from '../lib/api';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, Cell } from 'recharts';
 
+/** Round display numbers to 2 decimal places (e.g. 29.506… → 29.51). */
+const formatNum = (value, digits = 2) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value ?? '—';
+  return n.toFixed(digits);
+};
+
 export default function DashboardPage() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -242,8 +249,7 @@ export default function DashboardPage() {
 
                 <div className="p-3 rounded-md bg-primary/10 border border-primary/20">
                   <p className="text-xs text-muted-foreground">
-                    <strong>Note:</strong> Max upload 80MB on free hosting. Large CSVs are auto-sampled
-                    (up to ~80k rows loaded, ~12k for ML) so analysis can finish on Render.
+                    <strong>Note:</strong> Max Upload 80MB
                   </p>
                 </div>
 
@@ -326,12 +332,12 @@ export default function DashboardPage() {
                 <Tabs defaultValue="overview" className="space-y-6">
                   <TabsList className="grid grid-cols-6 w-full">
                     <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+                    <TabsTrigger value="hypotheses" data-testid="tab-hypotheses">Hypotheses</TabsTrigger>
+                    <TabsTrigger value="anomalies" data-testid="tab-anomalies">Anomalies</TabsTrigger>
                     <TabsTrigger value="visualizations" data-testid="tab-visualizations">
                       <BarChart3 className="w-4 h-4 mr-1" />
                       Charts
                     </TabsTrigger>
-                    <TabsTrigger value="anomalies" data-testid="tab-anomalies">Anomalies</TabsTrigger>
-                    <TabsTrigger value="hypotheses" data-testid="tab-hypotheses">Hypotheses</TabsTrigger>
                     <TabsTrigger value="ml" data-testid="tab-ml">ML</TabsTrigger>
                     <TabsTrigger value="chat" data-testid="tab-chat">Chat</TabsTrigger>
                   </TabsList>
@@ -386,7 +392,7 @@ export default function DashboardPage() {
                               <span className="metric-label">Confidence</span>
                               <div className="flex items-center gap-2">
                                 <Progress value={currentAnalysis.root_cause.confidence_score * 100} className="h-2 w-32" />
-                                <span className="metric-value text-xl">{(currentAnalysis.root_cause.confidence_score * 100).toFixed(0)}%</span>
+                                <span className="metric-value text-xl">{(currentAnalysis.root_cause.confidence_score * 100).toFixed(2)}%</span>
                               </div>
                             </div>
                           </div>
@@ -439,13 +445,18 @@ export default function DashboardPage() {
                                 textAnchor="end"
                                 height={80}
                               />
-                              <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                              <YAxis
+                                stroke="hsl(var(--muted-foreground))"
+                                tick={{ fontSize: 12 }}
+                                tickFormatter={(v) => formatNum(v)}
+                              />
                               <Tooltip 
                                 contentStyle={{ 
                                   backgroundColor: 'hsl(var(--card))', 
                                   border: '1px solid hsl(var(--border))',
                                   borderRadius: '6px'
-                                }} 
+                                }}
+                                formatter={(value) => formatNum(value)}
                               />
                               <Legend 
                                 onClick={(e) => handleLegendClick(e.dataKey)}
@@ -479,14 +490,20 @@ export default function DashboardPage() {
                           <ResponsiveContainer width="100%" height={300}>
                             <BarChart data={currentAnalysis.visualizations.feature_importance} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis type="number" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                              <XAxis
+                                type="number"
+                                stroke="hsl(var(--muted-foreground))"
+                                tick={{ fontSize: 12 }}
+                                tickFormatter={(v) => formatNum(v)}
+                              />
                               <YAxis dataKey="parameter" type="category" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} width={100} />
                               <Tooltip 
                                 contentStyle={{ 
                                   backgroundColor: 'hsl(var(--card))', 
                                   border: '1px solid hsl(var(--border))',
                                   borderRadius: '6px'
-                                }} 
+                                }}
+                                formatter={(value) => formatNum(value)}
                               />
                               <Bar dataKey="importance" fill="#3b82f6" />
                             </BarChart>
@@ -508,7 +525,7 @@ export default function DashboardPage() {
                                     <span className={`text-sm font-mono font-bold ${
                                       Math.abs(corr.correlation) > 0.7 ? 'text-primary' : 'text-muted-foreground'
                                     }`}>
-                                      {corr.correlation.toFixed(2)}
+                                      {formatNum(corr.correlation)}
                                     </span>
                                   </div>
                                   <Progress value={Math.abs(corr.correlation) * 100} className="h-1" />
@@ -560,16 +577,16 @@ export default function DashboardPage() {
                               <div className="space-y-1 text-xs">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Value:</span>
-                                  <span className="font-mono font-bold">{anomaly.value.toFixed(2)}</span>
+                                  <span className="font-mono font-bold">{formatNum(anomaly.value)}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Threshold:</span>
-                                  <span className="font-mono">{anomaly.threshold.toFixed(2)}</span>
+                                  <span className="font-mono">{formatNum(anomaly.threshold)}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Deviation:</span>
                                   <span className="font-mono text-destructive">
-                                    {((anomaly.value / anomaly.threshold - 1) * 100).toFixed(0)}%
+                                    {formatNum((anomaly.value / anomaly.threshold - 1) * 100, 2)}%
                                   </span>
                                 </div>
                               </div>
@@ -594,7 +611,7 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-2">
                                   <Progress value={hyp.probability * 100} className="h-2 w-20" />
                                   <span className="text-lg font-mono font-bold text-primary">
-                                    {(hyp.probability * 100).toFixed(0)}%
+                                    {(hyp.probability * 100).toFixed(2)}%
                                   </span>
                                 </div>
                               </div>
@@ -631,7 +648,7 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-2">
                                   <span className="metric-label">Accuracy</span>
                                   <span className="metric-value text-xl text-primary">
-                                    {(result.accuracy * 100).toFixed(1)}%
+                                    {(result.accuracy * 100).toFixed(2)}%
                                   </span>
                                 </div>
                               </div>
@@ -644,7 +661,7 @@ export default function DashboardPage() {
                                       <div key={feature}>
                                         <div className="flex items-center justify-between text-xs mb-1">
                                           <span className="font-mono">{feature}</span>
-                                          <span className="font-mono font-bold">{(importance * 100).toFixed(0)}%</span>
+                                          <span className="font-mono font-bold">{formatNum(importance * 100)}%</span>
                                         </div>
                                         <Progress value={importance * 100} className="h-2" />
                                       </div>
@@ -768,7 +785,7 @@ export default function DashboardPage() {
           <Card className="p-6 data-card">
             <h3 className="text-lg font-semibold mb-4">Recent Analyses</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {analyses.slice(0, 6).map(analysis => (
+              {analyses.slice(0, 10).map(analysis => (
                 <div
                   key={analysis.id}
                   className="p-4 rounded-md border border-border hover:border-primary/50 cursor-pointer transition-colors bg-secondary"

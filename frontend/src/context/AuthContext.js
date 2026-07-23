@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login({ email, password });
       localStorage.setItem('token', response.data.access_token);
       setUser(response.data.user);
+      setLoading(false);
       return response.data;
     } catch (error) {
       console.error('Login error:', error);
@@ -52,6 +53,7 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.register({ email, password, full_name });
       localStorage.setItem('token', response.data.access_token);
       setUser(response.data.user);
+      setLoading(false);
       return response.data;
     } catch (error) {
       console.error('Register error:', error);

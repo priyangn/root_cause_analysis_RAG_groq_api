@@ -23,7 +23,7 @@ export default function RegisterPage() {
     try {
       await register(formData.email, formData.password, formData.full_name);
       toast.success('Registration successful');
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {
