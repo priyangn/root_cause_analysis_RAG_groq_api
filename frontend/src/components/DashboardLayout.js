@@ -1,8 +1,9 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/button';
+import { Button } from './ui/button';
 import { LogOut, Activity, User, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AppFooter from './AppFooter';
 
 export const DashboardLayout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -14,7 +15,7 @@ export const DashboardLayout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex items-center justify-between px-6 h-16">
           <div className="flex items-center gap-4">
@@ -52,9 +53,11 @@ export const DashboardLayout = ({ children }) => {
         </div>
       </header>
 
-      <main className="p-6">
+      <main className="p-6 flex-1">
         {children}
       </main>
+
+      <AppFooter />
     </div>
   );
 };
