@@ -349,7 +349,12 @@ async def delete_analysis(analysis_id: str, user_id: str = Depends(get_current_u
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage, user_id: str = Depends(get_current_user)):
     try:
-        from chat_guardrails import check_message_allowed, build_chat_prompt, DECLINE_MESSAGE
+        from chat_guardrails import (
+            check_message_allowed,
+            build_chat_prompt,
+            build_analysis_context,
+            DECLINE_MESSAGE,
+        )
 
         allowed, decline = check_message_allowed(message.message)
         if not allowed:
@@ -365,23 +370,15 @@ async def chat(message: ChatMessage, user_id: str = Depends(get_current_user)):
             })
             return ChatResponse(response=response, sources=None)
 
-        analysis_context = "No analysis selected — answer generally about RCA workflow only if relevant."
-        root_cause_info = "No analysis selected"
-
+        analysis = None
         if message.analysis_id:
             analysis = await db.analyses.find_one(
                 {"id": message.analysis_id, "user_id": user_id},
                 {"_id": 0}
             )
-            if analysis:
-                root_cause = analysis.get('root_cause') or {}
-                root_cause_info = f"""Root Cause: {root_cause.get('root_cause', 'Not determined')}
-Confidence: {root_cause.get('confidence_score', 0) * 100:.0f}%
-Anomalies Detected: {len(analysis.get('anomalies', []))}
-Hypotheses: {len(analysis.get('hypotheses', []))}
-ML models: {len(analysis.get('ml_results', []))}
-Status: {analysis.get('status', 'unknown')}"""
-                analysis_context = root_cause_info
+
+        analysis_context = build_analysis_context(analysis)
+        root_cause_info = analysis_context
 
         history = []
         for item in (message.history or [])[-8:]:
@@ -394,24 +391,23 @@ Status: {analysis.get('status', 'unknown')}"""
             agent = BaseAgent()
             prompt = build_chat_prompt(message.message, analysis_context)
             response = await agent.send_message(
-                "You are CauseSense AI. Follow the safety and scope rules in the user message. "
-                "Use prior conversation turns when the user asks follow-ups.",
+                "You are CauseSense AI. Answer only from the provided analysis facts. "
+                "Never invent ML model names or accuracies — copy them from the context.",
                 prompt,
                 history=history,
             )
             if not response or not str(response).strip():
                 response = (
                     "I could not generate a reply just now. "
-                    "Please ask again about your analysis, anomalies, or root cause."
+                    "Please ask again about your analysis, anomalies, ML results, or root cause."
                 )
 
         except Exception as llm_error:
             logger.error(f"LLM error in chat: {llm_error}")
             response = (
-                f"Based on the analysis: {root_cause_info}\n\n"
+                f"Based on the analysis:\n{root_cause_info[:1500]}\n\n"
                 "I could not reach the AI service just now. "
-                "Please check the Overview tab for your analysis results, "
-                "or ask again about anomalies, ML findings, or root cause."
+                "Please check the Overview / ML tabs for exact model names and accuracies."
             )
 
         await db.chat_messages.insert_one({
