@@ -262,6 +262,10 @@ async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[s
                 "causal_analysis": result.get("causal_analysis"),
                 "root_cause": result.get("root_cause"),
                 "visualizations": result.get("visualizations") or {},
+                "data_summary": result.get("data_summary") or {},
+                "document_excerpts": result.get("document_excerpts") or [],
+                "uploaded_files": result.get("uploaded_files") or [],
+                "knowledge_insights": result.get("knowledge_insights") or "",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )

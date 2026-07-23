@@ -41,7 +41,11 @@ class AnalysisPipeline:
                 "ml_results": [],
                 "causal_analysis": [],
                 "root_cause": None,
-                "visualizations": {}
+                "visualizations": {},
+                "data_summary": {},
+                "document_excerpts": [],
+                "uploaded_files": [],
+                "knowledge_insights": "",
             }
             
             if progress_callback:
@@ -54,9 +58,24 @@ class AnalysisPipeline:
             for file_path in file_paths:
                 parsed = DocumentParser.parse_file(file_path)
                 parsed_files.append(parsed)
+                name = Path(file_path).name
+                result["uploaded_files"].append({
+                    "name": name,
+                    "path": file_path,
+                    "has_text": bool(parsed.get("content")),
+                    "has_table": parsed.get("dataframe") is not None
+                    and not getattr(parsed.get("dataframe"), "empty", True),
+                })
                 
                 if parsed.get('content'):
                     documents.append(parsed['content'])
+                    # Keep a short excerpt for chat / grounding (not full manuals)
+                    excerpt = (parsed["content"] or "").strip()[:3500]
+                    if excerpt:
+                        result["document_excerpts"].append({
+                            "file": name,
+                            "excerpt": excerpt,
+                        })
                 if parsed.get('dataframe') is not None and not parsed['dataframe'].empty:
                     dataframes.append(parsed['dataframe'])
             
@@ -74,11 +93,25 @@ class AnalysisPipeline:
             
             data_analysis = await self.data_agent.analyze_data(dataframes, self.session_id)
             result['anomalies'] = data_analysis.get('anomalies', [])
+            result['data_summary'] = data_analysis.get('summary') or {}
+            # Optional short AI note from data agent (truncate for storage)
+            ai_note = data_analysis.get('ai_analysis') or ""
+            if isinstance(ai_note, str) and ai_note.strip():
+                result['data_summary'] = {
+                    **(result['data_summary'] if isinstance(result['data_summary'], dict) else {}),
+                    "ai_analysis_excerpt": ai_note.strip()[:2000],
+                }
             
             if progress_callback:
                 await progress_callback(45, "Analyzing knowledge base...", 15)
             
             knowledge_analysis = await self.knowledge_agent.analyze_documents(documents, self.session_id)
+            if isinstance(knowledge_analysis, str):
+                result["knowledge_insights"] = knowledge_analysis[:3000]
+            elif isinstance(knowledge_analysis, dict):
+                result["knowledge_insights"] = str(knowledge_analysis)[:3000]
+            else:
+                result["knowledge_insights"] = ""
             
             if progress_callback:
                 await progress_callback(55, "Generating hypotheses...", 12)

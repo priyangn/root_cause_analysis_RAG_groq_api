@@ -98,6 +98,10 @@ class AnalysisResult(BaseModel):
     causal_analysis: Optional[List[CausalParameter]] = None
     root_cause: Optional[RootCauseResult] = None
     visualizations: Optional[Dict[str, Any]] = None
+    data_summary: Optional[Dict[str, Any]] = None
+    document_excerpts: Optional[List[Dict[str, Any]]] = None
+    uploaded_files: Optional[List[Dict[str, Any]]] = None
+    knowledge_insights: Optional[str] = None
     created_at: str
     updated_at: str
 
