@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -21,8 +21,8 @@ def _unique_models() -> List[str]:
         preferred,
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "openai/gpt-oss-120b",
         "openai/gpt-oss-20b",
+        "openai/gpt-oss-120b",
     ]
     seen = set()
     out = []
@@ -31,6 +31,14 @@ def _unique_models() -> List[str]:
             seen.add(m)
             out.append(m)
     return out
+
+
+def _primary_and_fallback_models() -> Tuple[str, List[str]]:
+    models = _unique_models()
+    primary = models[0]
+    fallbacks = models[1:]
+    return primary, fallbacks
+
 
 
 def _load_groq_keys() -> List[str]:
@@ -131,46 +139,85 @@ class BaseAgent:
             )
         return (chat_completion.choices[0].message.content or "").strip()
 
+    def _try_once(self, client: Groq, messages: list, model: str, key_label: str):
+        """Returns (text|None, error|None, auth_failed: bool)."""
+        try:
+            text = self._groq_complete(client, messages, model)
+            if text:
+                logger.info("Groq OK model=%s %s", model, key_label)
+                return text, None, False
+            return None, RuntimeError(f"Empty response from {model}"), False
+        except Exception as e:
+            logger.warning("Groq fail model=%s %s: %s", model, key_label, e)
+            return None, e, _is_auth_error(e)
+
     def _call_groq_with_fallback(self, messages: list) -> str:
-        """Try each API key × each model until one succeeds."""
+        """
+        Failover order:
+          1) Preferred Llama model with key changeovers:
+             key1 → key2 → key1 → key2  (two full changeover rounds)
+          2) If that still fails, try other free-tier models with the same
+             key rotation (one pass per model: key1 → key2 → …).
+        Auth-failed keys are skipped for the rest of the request.
+        """
+        if not self.groq_keys:
+            raise RuntimeError("No Groq API keys configured")
+
+        primary, fallback_models = _primary_and_fallback_models()
         last_error: Optional[Exception] = None
-        models = _unique_models()
+        dead_keys = set()
 
-        for key_index, api_key in enumerate(self.groq_keys):
-            client = Groq(api_key=api_key)
-            key_label = f"key#{key_index + 1}"
-            skip_key = False
+        def active_keys():
+            return [
+                (i, k)
+                for i, k in enumerate(self.groq_keys)
+                if i not in dead_keys
+            ]
 
-            for model in models:
-                if skip_key:
+        def try_model_with_key_rounds(model: str, rounds: int) -> Optional[str]:
+            nonlocal last_error
+            for round_num in range(1, rounds + 1):
+                keys = active_keys()
+                if not keys:
                     break
-                for attempt in range(2):
-                    try:
-                        text = self._groq_complete(client, messages, model)
-                        if text:
-                            logger.info("Groq OK model=%s %s", model, key_label)
-                            return text
-                        last_error = RuntimeError(f"Empty response from {model}")
-                    except Exception as e:
-                        last_error = e
-                        logger.warning(
-                            "Groq fail model=%s %s attempt=%s: %s",
-                            model,
+                logger.info(
+                    "Groq key-round %s/%s model=%s keys=%s",
+                    round_num,
+                    rounds,
+                    model,
+                    len(keys),
+                )
+                for key_index, api_key in keys:
+                    key_label = f"key#{key_index + 1}"
+                    client = Groq(api_key=api_key)
+                    text, err, auth_failed = self._try_once(
+                        client, messages, model, key_label
+                    )
+                    if text:
+                        return text
+                    if err is not None:
+                        last_error = err
+                    if auth_failed:
+                        dead_keys.add(key_index)
+                        logger.error(
+                            "Groq auth failed for %s — skipping this key",
                             key_label,
-                            attempt + 1,
-                            e,
                         )
-                        if _is_auth_error(e):
-                            logger.error(
-                                "Groq auth failed for %s — trying next key",
-                                key_label,
-                            )
-                            skip_key = True
-                            break
-                        if _is_retryable(e) and attempt == 0:
-                            time.sleep(1.2 * (attempt + 1))
-                            continue
-                        break  # next model with same key
+                        continue
+                    if err is not None and _is_retryable(err):
+                        time.sleep(1.0)
+            return None
+
+        # Phase 1: preferred model, two changeover rounds (key1↔key2 twice)
+        text = try_model_with_key_rounds(primary, rounds=2)
+        if text:
+            return text
+
+        # Phase 2: other free-tier models (one key pass each)
+        for model in fallback_models:
+            text = try_model_with_key_rounds(model, rounds=1)
+            if text:
+                return text
 
         raise RuntimeError(str(last_error) if last_error else "Groq request failed")
 
