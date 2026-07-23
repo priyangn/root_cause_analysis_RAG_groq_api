@@ -135,17 +135,52 @@ export default function DashboardPage() {
     }
 
     try {
+      if (pollInterval.current) {
+        clearInterval(pollInterval.current);
+        pollInterval.current = null;
+      }
+
       const response = await analysisAPI.startAnalysis(selectedFiles, projectName);
       const analysisId = response.data.id;
+      setCurrentAnalysis(response.data);
+      setChatHistory([]);
       toast.success('Analysis started');
-      
+
+      const analysisHasResults = (data) =>
+        Boolean(
+          data?.root_cause ||
+          (Array.isArray(data?.anomalies) && data.anomalies.length > 0) ||
+          (Array.isArray(data?.hypotheses) && data.hypotheses.length > 0) ||
+          (Array.isArray(data?.ml_results) && data.ml_results.length > 0) ||
+          (data?.visualizations &&
+            (data.visualizations.time_series?.length > 0 ||
+              data.visualizations.feature_importance?.length > 0 ||
+              data.visualizations.correlation))
+        );
+
       pollInterval.current = setInterval(async () => {
         try {
           const result = await analysisAPI.getAnalysis(analysisId);
           setCurrentAnalysis(result.data);
-          
-          if (result.data.status === 'completed' || result.data.status === 'failed') {
+
+          const done =
+            result.data.status === 'completed' || result.data.status === 'failed';
+
+          // Wait until completed AND results are present (avoids empty tabs race)
+          if (result.data.status === 'completed' && !analysisHasResults(result.data)) {
+            return;
+          }
+
+          if (done) {
             clearInterval(pollInterval.current);
+            pollInterval.current = null;
+            // Final refresh so all tabs get the full payload
+            try {
+              const finalResult = await analysisAPI.getAnalysis(analysisId);
+              setCurrentAnalysis(finalResult.data);
+            } catch (_) {
+              /* keep last polled state */
+            }
             if (result.data.status === 'completed') {
               toast.success('Analysis completed');
             } else {
@@ -155,6 +190,7 @@ export default function DashboardPage() {
           }
         } catch (error) {
           clearInterval(pollInterval.current);
+          pollInterval.current = null;
         }
       }, 2000);
       

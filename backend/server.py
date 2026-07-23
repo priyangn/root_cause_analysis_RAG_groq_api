@@ -233,11 +233,14 @@ async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[s
         pipeline = AnalysisPipeline(user_id, analysis_id)
         
         async def update_progress(progress: int, message: str, estimated_seconds: int = 0):
+            # Never mark completed here — results are written only after pipeline.run returns.
+            # Cap interim progress at 99 so the UI keeps polling until full results exist.
+            capped = min(int(progress), 99)
             await db.analyses.update_one(
                 {"id": analysis_id},
                 {"$set": {
-                    "progress": progress,
-                    "status": "processing" if progress < 100 else "completed",
+                    "progress": capped,
+                    "status": "processing",
                     "current_step": message,
                     "estimated_time_remaining": estimated_seconds,
                     "updated_at": datetime.now(timezone.utc).isoformat()
@@ -253,12 +256,12 @@ async def run_analysis_pipeline(analysis_id: str, user_id: str, file_ids: List[s
                 "progress": 100,
                 "current_step": "Complete",
                 "estimated_time_remaining": 0,
-                "anomalies": result["anomalies"],
-                "hypotheses": result["hypotheses"],
-                "ml_results": result["ml_results"],
-                "causal_analysis": result["causal_analysis"],
-                "root_cause": result["root_cause"],
-                "visualizations": result.get("visualizations", {}),
+                "anomalies": result.get("anomalies") or [],
+                "hypotheses": result.get("hypotheses") or [],
+                "ml_results": result.get("ml_results") or [],
+                "causal_analysis": result.get("causal_analysis"),
+                "root_cause": result.get("root_cause"),
+                "visualizations": result.get("visualizations") or {},
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )

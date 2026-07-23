@@ -138,7 +138,7 @@ class AnalysisPipeline:
                 }
             
             if progress_callback:
-                await progress_callback(100, "Analysis complete", 0)
+                await progress_callback(99, "Saving results...", 1)
             
             return result
             
